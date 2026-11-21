@@ -1,24 +1,8 @@
-from unittest.mock import AsyncMock
-
 import pytest
 from pydantic import ValidationError
 
 from bot import strings
 from bot.config import Settings
-from bot.handlers import build_router
-from bot.handlers.start import cmd_start
-
-
-async def test_start_replies_with_welcome():
-    message = AsyncMock()
-
-    await cmd_start(message)
-
-    message.answer.assert_awaited_once_with(strings.WELCOME)
-
-
-def test_router_builds():
-    assert build_router() is not None
 
 
 def test_no_em_dashes_in_strings():
@@ -31,6 +15,14 @@ def test_settings_parse_admin_ids():
     settings = Settings(_env_file=None, bot_token="x", admin_ids="1, 22,333")
 
     assert settings.admin_id_list == [1, 22, 333]
+
+
+def test_settings_default_database_is_local_sqlite(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    settings = Settings(_env_file=None, bot_token="x")
+
+    assert settings.database_url.startswith("sqlite+aiosqlite:///")
 
 
 def test_settings_require_bot_token(monkeypatch):

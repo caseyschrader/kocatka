@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     bot_token: str
     admin_ids: str = ""
+    database_url: str = "sqlite+aiosqlite:///kocatka.db"
 
     @property
     def admin_id_list(self) -> list[int]:

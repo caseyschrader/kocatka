@@ -3,10 +3,11 @@
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot
 
+from bot.app import build_dispatcher
 from bot.config import load_settings
-from bot.handlers import build_router
+from bot.db.session import init_db, make_engine, make_sessionmaker
 
 
 async def main() -> None:
@@ -16,12 +17,17 @@ async def main() -> None:
     )
     settings = load_settings()
 
-    bot = Bot(token=settings.bot_token)
-    dispatcher = Dispatcher()
-    dispatcher.include_router(build_router())
+    engine = make_engine(settings.database_url)
+    await init_db(engine)
 
-    # Polling: the bot asks Telegram for new messages. No public server needed.
-    await dispatcher.start_polling(bot)
+    bot = Bot(token=settings.bot_token)
+    dispatcher = build_dispatcher()
+    try:
+        # Polling: the bot asks Telegram for new messages. No public server needed.
+        # Extra keyword arguments become available to middlewares and handlers.
+        await dispatcher.start_polling(bot, sessionmaker=make_sessionmaker(engine))
+    finally:
+        await engine.dispose()
 
 
 if __name__ == "__main__":
