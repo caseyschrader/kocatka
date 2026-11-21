@@ -45,5 +45,14 @@ def city() -> InlineKeyboardMarkup:
     )
 
 
+def swipe(target_id: int) -> InlineKeyboardMarkup:
+    return _keyboard(
+        [
+            (strings.BTN_LIKE, f"swipe:like:{target_id}"),
+            (strings.BTN_PASS, f"swipe:pass:{target_id}"),
+        ]
+    )
+
+
 def photos_done() -> InlineKeyboardMarkup:
     return _keyboard([(strings.BTN_PHOTOS_DONE, "photos:done")])

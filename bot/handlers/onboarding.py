@@ -26,6 +26,7 @@ class Onboarding(StatesGroup):
     gender = State()
     preference = State()
     age = State()
+    age_range = State()
     city = State()
     bio = State()
     photos = State()
@@ -134,13 +135,29 @@ async def on_age(message: Message, state: FSMContext) -> None:
         await message.answer(strings.UNDERAGE)
         return
     await state.update_data(age=age)
-    await state.set_state(Onboarding.city)
-    await message.answer(strings.ASK_CITY, reply_markup=keyboards.city())
+    await state.set_state(Onboarding.age_range)
+    await message.answer(strings.ASK_AGE_RANGE)
 
 
 @router.message(Onboarding.age)
 async def on_age_not_text(message: Message) -> None:
     await message.answer(strings.AGE_INVALID)
+
+
+@router.message(Onboarding.age_range, F.text)
+async def on_age_range(message: Message, state: FSMContext) -> None:
+    age_range = profiles.parse_age_range(message.text)
+    if age_range is None:
+        await message.answer(strings.AGE_RANGE_INVALID)
+        return
+    await state.update_data(age_min=age_range[0], age_max=age_range[1])
+    await state.set_state(Onboarding.city)
+    await message.answer(strings.ASK_CITY, reply_markup=keyboards.city())
+
+
+@router.message(Onboarding.age_range)
+async def on_age_range_not_text(message: Message) -> None:
+    await message.answer(strings.AGE_RANGE_INVALID)
 
 
 @router.callback_query(Onboarding.city, F.data.in_({"city:spb", "city:other"}))
@@ -224,6 +241,8 @@ async def _finish(
             gender=data["gender"],
             preference=data["preference"],
             age=data["age"],
+            age_min=data["age_min"],
+            age_max=data["age_max"],
             city=data["city"],
             bio=data["bio"],
             photo_file_ids=data["photos"],
@@ -232,3 +251,4 @@ async def _finish(
     await state.clear()
     await message.answer(strings.PROFILE_SAVED)
     await send_profile_card(message, profile)
+    await message.answer(strings.BROWSE_HINT)

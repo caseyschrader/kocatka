@@ -1,13 +1,14 @@
 """Profile rules and storage. No Telegram code here, so it is easy to test."""
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from bot.db.models import Photo, Profile, User
+from bot.db.models import Photo, Profile, Swipe, User
 
 MIN_AGE = 18
 MAX_AGE = 99
@@ -28,6 +29,8 @@ class NewProfile:
     gender: str
     preference: str
     age: int
+    age_min: int
+    age_max: int
     city: str
     bio: str
     photo_file_ids: list[str]
@@ -46,6 +49,21 @@ def parse_age(text: str) -> int | None:
     if age < 1 or age > MAX_AGE:
         return None
     return age
+
+
+def parse_age_range(text: str) -> tuple[int, int] | None:
+    """Reads a range such as "25-35" or "от 25 до 35".
+
+    Returns (min, max), or None unless the text holds exactly two numbers,
+    both between MIN_AGE and MAX_AGE. The order does not matter.
+    """
+    numbers = [int(n) for n in re.findall(r"\d+", text)]
+    if len(numbers) != 2:
+        return None
+    low, high = sorted(numbers)
+    if low < MIN_AGE or high > MAX_AGE:
+        return None
+    return low, high
 
 
 def clean_bio(text: str) -> str | None:
@@ -68,6 +86,9 @@ async def get_profile(session: AsyncSession, user_id: int) -> Profile | None:
 
 async def delete_user_data(session: AsyncSession, user_id: int) -> None:
     """Removes every row we hold about a user. Does not commit."""
+    await session.execute(
+        delete(Swipe).where(or_(Swipe.viewer_id == user_id, Swipe.target_id == user_id))
+    )
     await session.execute(delete(Photo).where(Photo.user_id == user_id))
     await session.execute(delete(Profile).where(Profile.user_id == user_id))
     await session.execute(delete(User).where(User.id == user_id))
@@ -81,6 +102,8 @@ async def save_profile(session: AsyncSession, new: NewProfile) -> Profile:
         raise ValueError(f"unknown preference: {new.preference}")
     if not MIN_AGE <= new.age <= MAX_AGE:
         raise ValueError(f"age out of range: {new.age}")
+    if not MIN_AGE <= new.age_min <= new.age_max <= MAX_AGE:
+        raise ValueError(f"bad age range: {new.age_min} to {new.age_max}")
     if not 1 <= len(new.photo_file_ids) <= MAX_PHOTOS:
         raise ValueError(f"expected 1 to {MAX_PHOTOS} photos")
 
@@ -99,6 +122,8 @@ async def save_profile(session: AsyncSession, new: NewProfile) -> Profile:
             gender=new.gender,
             preference=new.preference,
             age=new.age,
+            age_min=new.age_min,
+            age_max=new.age_max,
             city=new.city,
             bio=new.bio,
         )

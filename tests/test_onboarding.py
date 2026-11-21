@@ -22,6 +22,7 @@ async def go_to_photos(chat, age: str = "27", bio: str = "Люблю белые 
     await chat.press("gender:female")
     await chat.press("pref:men")
     await chat.send_text(age)
+    await chat.send_text("25-35")
     await chat.press("city:spb")
     await chat.send_text(bio)
 
@@ -42,6 +43,7 @@ async def test_questions_come_in_order(chat):
         strings.ASK_GENDER,
         strings.ASK_PREFERENCE,
         strings.ASK_AGE,
+        strings.ASK_AGE_RANGE,
         strings.ASK_CITY,
         strings.ASK_BIO,
         strings.ASK_PHOTOS,
@@ -62,11 +64,12 @@ async def test_full_flow_saves_profile(chat, sessionmaker):
     assert profile.gender == "female"
     assert profile.preference == "men"
     assert profile.age == 27
+    assert (profile.age_min, profile.age_max) == (25, 35)
     assert profile.city == "Санкт-Петербург"
     assert profile.bio == "Люблю белые ночи"
     assert [p.file_id for p in profile.photos] == ["photo-1", "photo-2"]
 
-    assert chat.last_text == strings.PROFILE_SAVED
+    assert chat.texts[-2:] == [strings.PROFILE_SAVED, strings.BROWSE_HINT]
     card = chat.photos[-1]
     assert card.photo == "photo-1"
     assert "Аня, 27" in card.caption
@@ -86,7 +89,7 @@ async def test_third_photo_finishes_automatically(chat, sessionmaker):
         await chat.send_photo(f"photo-{n}")
 
     assert await count(sessionmaker, Photo) == 3
-    assert chat.last_text == strings.PROFILE_SAVED
+    assert strings.PROFILE_SAVED in chat.texts
 
 
 async def test_fourth_photo_is_not_added(chat, sessionmaker):
@@ -141,7 +144,7 @@ async def test_invalid_age_asks_again(chat):
     assert chat.last_text == strings.AGE_INVALID
 
     await chat.send_text("31")
-    assert chat.last_text == strings.ASK_CITY
+    assert chat.last_text == strings.ASK_AGE_RANGE
 
 
 async def test_typed_age_under_18_stops(chat, sessionmaker):
@@ -165,6 +168,7 @@ async def test_other_city_stops_and_stores_nothing(chat, sessionmaker):
     await chat.press("gender:female")
     await chat.press("pref:men")
     await chat.send_text("30")
+    await chat.send_text("25-40")
     await chat.press("city:other")
 
     assert chat.last_text == strings.CITY_NOT_SUPPORTED
@@ -259,3 +263,46 @@ async def test_two_users_do_not_mix(sessionmaker):
         o = await profiles.get_profile(session, oleg.user_id)
     assert (a.age, a.bio, a.photos[0].file_id) == (27, "Аня о себе", "anya-photo")
     assert (o.age, o.bio, o.photos[0].file_id) == (33, "Олег о себе", "oleg-photo")
+
+
+async def go_to_age_range(chat) -> None:
+    await chat.send_text("/start")
+    await chat.press("adult:yes")
+    await chat.press("consent:yes")
+    await chat.press("gender:female")
+    await chat.press("pref:men")
+    await chat.send_text("27")
+
+
+async def test_age_range_below_18_is_refused(chat):
+    await go_to_age_range(chat)
+
+    for bad in ("16-30", "17-17", "0-25"):
+        await chat.send_text(bad)
+        assert chat.last_text == strings.AGE_RANGE_INVALID
+
+    await chat.send_text("18-30")
+    assert chat.last_text == strings.ASK_CITY
+
+
+async def test_age_range_must_be_two_numbers(chat):
+    await go_to_age_range(chat)
+
+    for bad in ("30", "любой", "20-30-40", "25-120"):
+        await chat.send_text(bad)
+        assert chat.last_text == strings.AGE_RANGE_INVALID
+    await chat.send_sticker()
+    assert chat.last_text == strings.AGE_RANGE_INVALID
+
+
+async def test_age_range_accepts_words_and_reversed_order(chat, sessionmaker):
+    await go_to_age_range(chat)
+    await chat.send_text("от 40 до 30")
+    await chat.press("city:spb")
+    await chat.send_text("О себе")
+    await chat.send_photo("photo-1")
+    await chat.press("photos:done")
+
+    async with sessionmaker() as session:
+        profile = await profiles.get_profile(session, chat.user_id)
+    assert (profile.age_min, profile.age_max) == (30, 40)

@@ -47,6 +47,12 @@ BTN_PREF_EVERYONE = "Со всеми"
 ASK_AGE = "Сколько вам лет? Напишите число."
 AGE_INVALID = "Напишите возраст числом, например 27."
 
+ASK_AGE_RANGE = (
+    "Какой возраст вам интересен? "
+    "Напишите диапазон, например 25-35. Минимум 18."
+)
+AGE_RANGE_INVALID = "Напишите два числа от 18 до 99, например 25-35."
+
 ASK_CITY = "В каком вы городе?"
 BTN_CITY_SPB = "Санкт-Петербург"
 BTN_CITY_OTHER = "Другой город"
@@ -79,7 +85,14 @@ ALREADY_REGISTERED = "У вас уже есть анкета:"
 NO_PROFILE = "У вас пока нет анкеты. Отправьте /start, чтобы создать её."
 PROFILE_CARD = "{name}, {age}\n{city}\n\n{bio}"
 
+# --- Browsing ---
+
+BROWSE_HINT = "Отправьте /browse, чтобы смотреть анкеты."
+BTN_LIKE = "❤️ Нравится"
+BTN_PASS = "Пропустить"
+NO_MORE_PROFILES = "Пока анкеты закончились. Загляните позже: /browse."
+
 # --- Fallbacks ---
 
 STALE_BUTTON = "Эта кнопка больше не активна."
-UNKNOWN = "Я пока понимаю только команды /start и /profile."
+UNKNOWN = "Я пока понимаю только команды /start, /profile и /browse."

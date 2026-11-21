@@ -2,7 +2,7 @@
 
 Kocatka (Косатка) is a Telegram bot to test whether women-first messaging has traction. See `CLAUDE.md` for the full brief and milestones.
 
-Status: milestone 2 (onboarding and profile storage).
+Status: milestone 3 (browsing with Like and Pass).
 
 ## Commands
 
@@ -11,6 +11,15 @@ Status: milestone 2 (onboarding and profile storage).
 | `/start` | Starts onboarding, or shows your profile if you already have one |
 | `/cancel` | Abandons onboarding. Nothing is saved |
 | `/profile` | Shows your profile as others will see it |
+| `/browse` | Shows profiles one at a time with Like and Pass buttons |
+
+## How browsing picks a profile
+
+A candidate is shown only if both people fit each other's filters: same city, each wants the other's gender, and each one's age is inside the other's chosen range. Anyone you already liked or passed is never shown again. People who already liked you come first, everyone else in random order.
+
+## Testing with one Telegram account
+
+Browsing needs at least two profiles. You can get a second one by asking a friend, or with a second Telegram account (Telegram allows several accounts in one app).
 
 ## Setup (Windows, PowerShell)
 

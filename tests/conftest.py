@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import pytest
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import SendMessage, SendPhoto
+from aiogram.methods import SendMediaGroup, SendMessage, SendPhoto
 from aiogram.types import Chat, Message
 
 from bot.app import build_dispatcher
@@ -34,13 +34,16 @@ class FakeSession(BaseSession):
 
     async def make_request(self, bot, method, timeout=None):
         self.calls.append(method)
-        if isinstance(method, (SendMessage, SendPhoto)):
-            return Message(
-                message_id=next(_ids),
-                date=datetime.now(timezone.utc),
-                chat=Chat(id=method.chat_id, type="private"),
-            )
-        return True
+        if not isinstance(method, (SendMessage, SendPhoto, SendMediaGroup)):
+            return True
+        message = Message(
+            message_id=next(_ids),
+            date=datetime.now(timezone.utc),
+            chat=Chat(id=method.chat_id, type="private"),
+        )
+        if isinstance(method, SendMediaGroup):
+            return [message]
+        return message
 
     async def stream_content(self, *args, **kwargs):
         yield b""
@@ -109,6 +112,46 @@ class FakeChat:
     def photos(self) -> list[SendPhoto]:
         return [call for call in self.network.calls if isinstance(call, SendPhoto)]
 
+    @property
+    def albums(self) -> list[SendMediaGroup]:
+        return [call for call in self.network.calls if isinstance(call, SendMediaGroup)]
+
+    @property
+    def shown_ids(self) -> list[int]:
+        """User ids of every browsing card shown, read from the Like buttons."""
+        ids = []
+        for call in self.network.calls:
+            markup = getattr(call, "reply_markup", None)
+            if markup is None:
+                continue
+            data = markup.inline_keyboard[0][0].callback_data
+            if data.startswith("swipe:like:"):
+                ids.append(int(data.split(":")[2]))
+        return ids
+
+    async def register(
+        self,
+        gender: str = "female",
+        pref: str = "men",
+        age: str = "27",
+        age_range: str = "18-99",
+        photos: int = 1,
+    ) -> None:
+        """Goes through the whole onboarding as this user."""
+        await self.send_text("/start")
+        await self.press("adult:yes")
+        await self.press("consent:yes")
+        await self.press(f"gender:{gender}")
+        await self.press(f"pref:{pref}")
+        await self.send_text(age)
+        await self.send_text(age_range)
+        await self.press("city:spb")
+        await self.send_text(f"О себе: {self.first_name}")
+        for n in range(photos):
+            await self.send_photo(f"{self.first_name}-photo-{n}")
+        if photos < 3:
+            await self.press("photos:done")
+
     # --- plumbing ---
 
     def _user(self) -> dict:
@@ -141,3 +184,9 @@ async def sessionmaker(tmp_path):
 @pytest.fixture
 def chat(sessionmaker) -> FakeChat:
     return FakeChat(sessionmaker)
+
+
+@pytest.fixture
+def new_chat(sessionmaker):
+    """Factory for tests that need several users: new_chat("Олег")."""
+    return lambda first_name: FakeChat(sessionmaker, first_name=first_name)

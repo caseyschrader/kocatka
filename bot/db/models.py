@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -34,6 +34,9 @@ class Profile(Base):
     gender: Mapped[str] = mapped_column(String(16))  # "female" | "male"
     preference: Mapped[str] = mapped_column(String(16))  # "women" | "men" | "everyone"
     age: Mapped[int] = mapped_column(Integer)
+    # Age range of the people this user wants to see. Never below 18.
+    age_min: Mapped[int] = mapped_column(Integer)
+    age_max: Mapped[int] = mapped_column(Integer)
     city: Mapped[str] = mapped_column(String(64))
     bio: Mapped[str] = mapped_column(String(500))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -50,3 +53,16 @@ class Photo(Base):
     # Telegram keeps the image. We only store its file id, never the bytes.
     file_id: Mapped[str] = mapped_column(String(255))
     position: Mapped[int] = mapped_column(Integer)
+
+
+class Swipe(Base):
+    """One Like or Pass. The unique constraint means one decision per pair."""
+
+    __tablename__ = "swipes"
+    __table_args__ = (UniqueConstraint("viewer_id", "target_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    viewer_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
+    target_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(8))  # "like" | "pass"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
