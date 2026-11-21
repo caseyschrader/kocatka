@@ -71,6 +71,22 @@ async def test_saving_again_replaces_old_data(sessionmaker):
         assert await session.scalar(select(func.count()).select_from(Photo)) == 1
 
 
+async def test_saving_again_keeps_swipes_and_signup_date(sessionmaker):
+    async with sessionmaker() as session:
+        first = await profiles.save_profile(session, new_profile())
+        created_at = first.created_at
+        await profiles.save_profile(session, new_profile(user_id=2))
+        session.add(Swipe(viewer_id=1, target_id=2, action="like"))
+        await session.commit()
+
+        again = await profiles.save_profile(session, new_profile(preference="everyone"))
+
+        assert again.preference == "everyone"
+        assert again.created_at == created_at
+        assert await session.scalar(select(func.count()).select_from(Swipe)) == 1
+        assert await session.scalar(select(func.count()).select_from(Profile)) == 2
+
+
 async def test_delete_user_data_removes_everything(sessionmaker):
     async with sessionmaker() as session:
         await profiles.save_profile(session, new_profile())

@@ -265,6 +265,76 @@ async def test_two_users_do_not_mix(sessionmaker):
     assert (o.age, o.bio, o.photos[0].file_id) == (33, "Олег о себе", "oleg-photo")
 
 
+async def register_quickly(chat) -> None:
+    await go_to_photos(chat)
+    await chat.send_photo("photo-1")
+    await chat.press("photos:done")
+
+
+async def test_start_card_has_redo_button(chat):
+    await register_quickly(chat)
+    await chat.send_text("/start")
+
+    button = chat.photos[-1].reply_markup.inline_keyboard[0][0]
+    assert (button.text, button.callback_data) == (strings.BTN_REDO, "profile:redo")
+
+
+async def test_redo_skips_age_and_consent_and_replaces_profile(chat, sessionmaker):
+    await register_quickly(chat)
+    await chat.press("profile:redo")
+    assert chat.texts[-2:] == [strings.REDO_START, strings.ASK_GENDER]
+
+    await chat.press("gender:female")
+    await chat.press("pref:everyone")
+    await chat.send_text("28")
+    await chat.send_text("20-40")
+    await chat.press("city:spb")
+    await chat.send_text("Обновлённая анкета")
+    await chat.send_photo("new-photo")
+    await chat.press("photos:done")
+
+    async with sessionmaker() as session:
+        profile = await profiles.get_profile(session, chat.user_id)
+    assert (profile.preference, profile.age, profile.age_min, profile.age_max) == (
+        "everyone", 28, 20, 40
+    )
+    assert profile.bio == "Обновлённая анкета"
+    assert [p.file_id for p in profile.photos] == ["new-photo"]
+    assert profile.user.consented_at is not None
+    assert await count(sessionmaker, Profile) == 1
+
+
+async def test_cancelled_redo_keeps_old_profile(chat, sessionmaker):
+    await register_quickly(chat)
+    await chat.press("profile:redo")
+    await chat.press("gender:male")
+    await chat.send_text("/cancel")
+
+    assert chat.last_text == strings.REDO_CANCELLED
+    async with sessionmaker() as session:
+        profile = await profiles.get_profile(session, chat.user_id)
+    assert profile.gender == "female"
+
+
+async def test_redo_with_other_city_keeps_old_profile(chat, sessionmaker):
+    await register_quickly(chat)
+    await chat.press("profile:redo")
+    await chat.press("gender:female")
+    await chat.press("pref:men")
+    await chat.send_text("27")
+    await chat.send_text("25-35")
+    await chat.press("city:other")
+
+    assert chat.last_text == strings.CITY_NOT_SUPPORTED_REDO
+    assert await count(sessionmaker, Profile) == 1
+
+
+async def test_redo_button_without_profile_does_nothing(chat):
+    await chat.press("profile:redo")
+
+    assert chat.texts == []
+
+
 async def go_to_age_range(chat) -> None:
     await chat.send_text("/start")
     await chat.press("adult:yes")

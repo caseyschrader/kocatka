@@ -54,5 +54,9 @@ def swipe(target_id: int) -> InlineKeyboardMarkup:
     )
 
 
+def redo() -> InlineKeyboardMarkup:
+    return _keyboard([(strings.BTN_REDO, "profile:redo")])
+
+
 def photos_done() -> InlineKeyboardMarkup:
     return _keyboard([(strings.BTN_PHOTOS_DONE, "photos:done")])

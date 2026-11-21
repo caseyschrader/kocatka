@@ -151,6 +151,55 @@ async def test_profile_with_several_photos_is_shown_as_album(new_chat):
     assert anya.shown_ids == [oleg.user_id]
 
 
+async def test_redo_fixes_a_wrong_preference(new_chat):
+    """The real case from testing: she picked "women" by mistake."""
+    casey = new_chat("Кейси")
+    polina = new_chat("Полина")
+    await casey.register(gender="male", pref="women", age="30", age_range="18-30")
+    await polina.register(gender="female", pref="women", age="19", age_range="20-27")
+
+    await casey.send_text("/browse")
+    assert casey.last_text == strings.NO_MORE_PROFILES
+
+    await polina.send_text("/start")
+    await polina.press("profile:redo")
+    await polina.press("gender:female")
+    await polina.press("pref:men")
+    await polina.send_text("19")
+    await polina.send_text("18-35")
+    await polina.press("city:spb")
+    await polina.send_text("Новая анкета")
+    await polina.send_photo("new-photo")
+    await polina.press("photos:done")
+
+    await casey.send_text("/browse")
+    assert casey.shown_ids == [polina.user_id]
+
+
+async def test_redo_keeps_swipes(new_chat, sessionmaker):
+    anya = new_chat("Аня")
+    oleg = new_chat("Олег")
+    await anya.register()
+    await oleg.register(gender="male", pref="women")
+    await anya.send_text("/browse")
+    await anya.press(f"swipe:pass:{oleg.user_id}")
+
+    await anya.send_text("/profile")
+    await anya.press("profile:redo")
+    await anya.press("gender:female")
+    await anya.press("pref:men")
+    await anya.send_text("27")
+    await anya.send_text("18-99")
+    await anya.press("city:spb")
+    await anya.send_text("Снова я")
+    await anya.send_photo("p")
+    await anya.press("photos:done")
+    await anya.send_text("/browse")
+
+    assert anya.last_text == strings.NO_MORE_PROFILES
+    assert await swipes(sessionmaker) == [(anya.user_id, oleg.user_id, "pass")]
+
+
 async def test_cannot_swipe_on_yourself(chat, sessionmaker):
     await chat.register()
     await chat.press(f"swipe:like:{chat.user_id}")

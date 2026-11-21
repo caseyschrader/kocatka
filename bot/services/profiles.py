@@ -95,7 +95,7 @@ async def delete_user_data(session: AsyncSession, user_id: int) -> None:
 
 
 async def save_profile(session: AsyncSession, new: NewProfile) -> Profile:
-    """Stores user, profile and photos in one transaction, replacing any old data."""
+    """Stores user, profile and photos in one transaction, replacing the old profile."""
     if new.gender not in GENDERS:
         raise ValueError(f"unknown gender: {new.gender}")
     if new.preference not in PREFERENCES:
@@ -107,8 +107,10 @@ async def save_profile(session: AsyncSession, new: NewProfile) -> Profile:
     if not 1 <= len(new.photo_file_ids) <= MAX_PHOTOS:
         raise ValueError(f"expected 1 to {MAX_PHOTOS} photos")
 
-    await delete_user_data(session, new.user_id)
-    session.add(
+    # Insert or update in place. Swipes are kept, so a redone profile still
+    # never sees the same people twice and earlier likes still count.
+    await session.execute(delete(Photo).where(Photo.user_id == new.user_id))
+    await session.merge(
         User(
             id=new.user_id,
             first_name=new.first_name[:64],
@@ -116,7 +118,7 @@ async def save_profile(session: AsyncSession, new: NewProfile) -> Profile:
             consented_at=new.consented_at,
         )
     )
-    session.add(
+    await session.merge(
         Profile(
             user_id=new.user_id,
             gender=new.gender,

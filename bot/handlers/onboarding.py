@@ -59,7 +59,7 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession) 
     profile = await profiles.get_profile(session, message.from_user.id)
     if profile is not None:
         await message.answer(strings.ALREADY_REGISTERED)
-        await send_profile_card(message, profile)
+        await send_profile_card(message, profile, reply_markup=keyboards.redo())
         return
 
     await state.clear()
@@ -68,13 +68,36 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession) 
     await message.answer(strings.ASK_ADULT, reply_markup=keyboards.adult())
 
 
+@router.callback_query(F.data == "profile:redo")
+async def on_redo(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    """Fills the profile in again. 18+ and consent were already given, so they are skipped.
+
+    The old profile stays live until the new one is finished.
+    """
+    profile = await profiles.get_profile(session, callback.from_user.id)
+    if profile is None:
+        await callback.answer(strings.STALE_BUTTON)
+        return
+    await _close_keyboard(callback)
+    await state.clear()
+    await state.update_data(
+        redo=True,
+        adult_confirmed_at=profile.user.adult_confirmed_at.isoformat(),
+        consented_at=profile.user.consented_at.isoformat(),
+    )
+    await state.set_state(Onboarding.gender)
+    await callback.message.answer(strings.REDO_START)
+    await callback.message.answer(strings.ASK_GENDER, reply_markup=keyboards.gender())
+
+
 @router.message(Command("cancel"))
 async def cmd_cancel(message: Message, state: FSMContext) -> None:
     if await state.get_state() is None:
         await message.answer(strings.NOTHING_TO_CANCEL)
         return
+    is_redo = (await state.get_data()).get("redo", False)
     await state.clear()
-    await message.answer(strings.CANCELLED)
+    await message.answer(strings.REDO_CANCELLED if is_redo else strings.CANCELLED)
 
 
 # --- Steps ---
@@ -164,8 +187,11 @@ async def on_age_range_not_text(message: Message) -> None:
 async def on_city(callback: CallbackQuery, state: FSMContext) -> None:
     await _close_keyboard(callback)
     if callback.data == "city:other":
+        is_redo = (await state.get_data()).get("redo", False)
         await state.clear()
-        await callback.message.answer(strings.CITY_NOT_SUPPORTED)
+        await callback.message.answer(
+            strings.CITY_NOT_SUPPORTED_REDO if is_redo else strings.CITY_NOT_SUPPORTED
+        )
         return
     await state.update_data(city=profiles.CITY_SPB)
     await state.set_state(Onboarding.bio)
