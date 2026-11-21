@@ -1,0 +1,18 @@
+# One service: the bot. The database lives in ./data on the server, outside the
+# container, so it survives rebuilds. Secrets come from .env, which is never in git.
+services:
+  bot:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:////data/kocatka.db
+    volumes:
+      - ./data:/data
+    # Start again after a crash or a server reboot.
+    restart: unless-stopped
+    # Keep logs from filling the disk: at most 3 files of 10 MB.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

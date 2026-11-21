@@ -2,7 +2,7 @@
 
 Kocatka (Косатка) is a Telegram bot to test whether women-first messaging has traction. See `CLAUDE.md` for the full brief and milestones.
 
-Status: milestone 6 (events table and first analytics queries).
+Status: milestone 7 (Docker and server deploy). See `docs/DEPLOY.md` for running it on a server and `docs/tester_invite.md` for the tester invite.
 
 ## Commands
 
