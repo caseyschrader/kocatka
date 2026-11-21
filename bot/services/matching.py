@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from bot.db.models import ChatMessage, Match, Profile, Swipe, as_utc, utcnow
+from bot.services.events import log_event
 from bot.services.browsing import LIKE
 
 MATCH_WINDOW = timedelta(hours=24)
@@ -70,6 +71,12 @@ async def create_match_if_mutual(
         expires_at=now + MATCH_WINDOW,
     )
     session.add(match)
+    await session.flush()  # assigns match.id
+    starters = await allowed_starters(session, match)
+    log_event(
+        session, "match_created", user_a, user_b, now,
+        match_id=match.id, same_gender=len(starters) == 2,
+    )
     await session.commit()
     return match
 
@@ -156,10 +163,11 @@ async def check_can_chat(
 
 
 async def record_message(
-    session: AsyncSession, match_id: int, sender_id: int, length: int
+    session: AsyncSession, match_id: int, sender_id: int, recipient_id: int, length: int
 ) -> None:
     """Notes that a message was relayed. The text is not stored."""
     session.add(ChatMessage(match_id=match_id, sender_id=sender_id, length=length))
+    log_event(session, "message_sent", sender_id, recipient_id, match_id=match_id, length=length)
     await session.commit()
 
 
@@ -168,9 +176,11 @@ async def start_conversation(
 ) -> str:
     """Records the first message. Returns OK or the reason it was refused."""
     now = now or utcnow()
-    outcome, _ = await check_can_start(session, match_id, sender_id, now)
+    outcome, match = await check_can_start(session, match_id, sender_id, now)
     if outcome != OK:
         return outcome
+    created_at = as_utc(match.created_at)
+    other_id = other_user(match, sender_id)
 
     # Conditional update: if the other person (same-gender pair) or the expiry
     # job got there a moment earlier, no row changes and we report that.
@@ -182,9 +192,14 @@ async def start_conversation(
         # datetimes, which cannot be compared in Python. get_match reloads anyway.
         .execution_options(synchronize_session=False)
     )
-    await session.commit()
     if result.rowcount != 1:
+        await session.commit()
         return ALREADY_STARTED
+    log_event(
+        session, "first_message_sent", sender_id, other_id, now,
+        match_id=match_id, seconds_since_match=int((now - created_at).total_seconds()),
+    )
+    await session.commit()
     return OK
 
 
@@ -199,6 +214,8 @@ async def expire_due(session: AsyncSession, now: datetime | None = None) -> list
         .execution_options(synchronize_session=False)
     )
     expired = result.all()
+    for match_id, user_a, user_b in expired:
+        log_event(session, "match_expired", user_a, user_b, now, match_id=match_id)
     await session.commit()
     return expired
 

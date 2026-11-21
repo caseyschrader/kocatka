@@ -2,7 +2,7 @@
 
 Kocatka (Косатка) is a Telegram bot to test whether women-first messaging has traction. See `CLAUDE.md` for the full brief and milestones.
 
-Status: milestone 5 (chat relay, report and block, admin ban, /delete_me).
+Status: milestone 6 (events table and first analytics queries).
 
 ## Commands
 
@@ -84,6 +84,24 @@ Profiles are stored in a local SQLite file, `kocatka.db`, created on first run. 
 * To start over as a new user, stop the bot and delete `kocatka.db`.
 * Tables are created automatically but never altered. Until Alembic arrives with PostgreSQL, a milestone that changes the tables means deleting `kocatka.db`.
 * Answers given during onboarding live in memory until the last step, so restarting the bot mid-onboarding loses them. The user sends `/start` again.
+
+## Analytics
+
+Every meaningful action is logged to an append-only `events` table (`event_id`, `event_type`, `user_id`, `target_id`, `ts`, `properties` as JSON). Event types are listed in `bot/services/events.py`.
+
+To see the funnel, retention, match rate, first-message rate, conversations and safety numbers:
+
+```powershell
+.venv\Scripts\python -m analytics.report
+```
+
+The queries are plain SQL files in `analytics/queries/`, one question each, in SQLite's dialect for now. Read-only, safe while the bot is running.
+
+Privacy rules for events:
+
+* `signup_started` and `signup_stopped` happen before consent and carry no user id.
+* Properties never hold names, text or other personal details, only things like `match_id`, `reason` or message length.
+* On `/delete_me` the user's id in every event is replaced with a random negative number. The history still counts toward totals and retention, but no longer points to the person.
 
 ## Quick stats
 

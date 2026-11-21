@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -77,7 +77,8 @@ class Match(Base):
     """A mutual like. user_a is always the smaller id, so each pair has one row."""
 
     __tablename__ = "matches"
-    __table_args__ = (UniqueConstraint("user_a", "user_b"),)
+    # sqlite_autoincrement: never reuse an id, because events refer to match ids.
+    __table_args__ = (UniqueConstraint("user_a", "user_b"), {"sqlite_autoincrement": True})
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_a: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
@@ -134,3 +135,20 @@ class Ban(Base):
     banned_by: Mapped[int] = mapped_column(BigInteger)
     reason: Mapped[str] = mapped_column(String(200), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Event(Base):
+    """Append-only analytics log. Rows are never edited, except to anonymise on /delete_me.
+
+    user_id is who acted, target_id is the other person (if any). Properties hold
+    only non-identifying details such as match_id, reason or message length.
+    """
+
+    __tablename__ = "events"
+
+    event_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_type: Mapped[str] = mapped_column(String(32), index=True)
+    user_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    target_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    properties: Mapped[dict] = mapped_column(JSON, default=dict)

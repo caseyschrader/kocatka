@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from bot.db.models import Block, ChatMessage, Match, Photo, Profile, Report, Swipe, User
+from bot.services.events import anonymise_user, log_event
 
 MIN_AGE = 18
 MAX_AGE = 99
@@ -87,8 +88,11 @@ async def get_profile(session: AsyncSession, user_id: int) -> Profile | None:
 async def delete_user_data(session: AsyncSession, user_id: int) -> None:
     """Removes every row we hold about a user. Does not commit.
 
-    The only thing kept is a ban, if there is one (see models.Ban).
+    Two things are kept: a ban, if there is one (see models.Ban), and the
+    user's analytics events, anonymised so they no longer point to the person.
     """
+    pseudonym = await anonymise_user(session, user_id)
+    log_event(session, "account_deleted", pseudonym)
     their_matches = select(Match.id).where(
         or_(Match.user_a == user_id, Match.user_b == user_id)
     )
@@ -122,6 +126,16 @@ async def save_profile(session: AsyncSession, new: NewProfile) -> Profile:
         raise ValueError(f"bad age range: {new.age_min} to {new.age_max}")
     if not 1 <= len(new.photo_file_ids) <= MAX_PHOTOS:
         raise ValueError(f"expected 1 to {MAX_PHOTOS} photos")
+
+    is_update = await session.get(Profile, new.user_id) is not None
+    log_event(
+        session,
+        "profile_updated" if is_update else "signup_completed",
+        new.user_id,
+        gender=new.gender,
+        age=new.age,
+        photos=len(new.photo_file_ids),
+    )
 
     # Insert or update in place. Swipes are kept, so a redone profile still
     # never sees the same people twice and earlier likes still count.

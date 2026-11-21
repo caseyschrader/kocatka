@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from bot.db.models import Ban, Block, Profile, Swipe
+from bot.services.events import log_event
 
 LIKE = "like"
 PASS = "pass"
@@ -85,5 +86,6 @@ async def record_swipe(
     if existing is not None:
         return False
     session.add(Swipe(viewer_id=viewer_id, target_id=target_id, action=action))
+    log_event(session, action, viewer_id, target_id)
     await session.commit()
     return True

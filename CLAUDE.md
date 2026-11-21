@@ -54,6 +54,7 @@ users, profiles, photos, swipes (viewer, target, action, ts), matches (user_a, u
 6. Events table and first analytics queries.
 7. Dockerize, deploy to a small VPS, invite a first batch of about 20 friendly testers.
 8. Optional: a simulation notebook using synthetic users to compare women-first versus open messaging on match-to-conversation rate.
+9. Later, after tester feedback: a Telegram Mini App for browsing (card-swiping web screen inside Telegram), reusing `bot/services/`. Chosen over a standalone PWA on 2026-11-21 to keep Telegram login, notifications and photo storage.
 
 ## Working agreement for Claude Code
 
@@ -75,5 +76,7 @@ users, profiles, photos, swipes (viewer, target, action, ts), matches (user_a, u
 * SQLite returns datetimes without a timezone. Wrap loaded values in `as_utc()` before comparing in Python, and pass `synchronize_session=False` on bulk updates that filter on datetimes.
 * Time-dependent services take an optional `now` argument so tests can move the clock.
 * Handlers get `admin_ids` (list of ints) as an argument, passed to `start_polling` and to `feed_raw_update` in tests. The `admin` fixture makes a test user an admin.
-* Relayed message text is never stored, only metadata in `messages`. `delete_user_data` must remove every table that mentions the user, except `bans`.
+* Relayed message text is never stored, only metadata in `messages`. `delete_user_data` must remove every table that mentions the user, except `bans`, and anonymise `events`.
+* Log analytics with `log_event(session, type, user_id, target_id, now, **props)` from `bot/services/events.py`, in the same transaction as the change it describes (it only adds; the caller commits). New event types go in `EVENT_TYPES`. Pre-consent events get no user id. Never put personal data in properties; other people go in `target_id` so anonymisation catches them.
+* Analytics queries live in `analytics/queries/*.sql` (first comment line is the title), run with `python -m analytics.report`. Each has a test in `tests/test_analytics.py` with seeded events and exact expected rows.
 * On Windows, git is at `C:\Program Files\Git\cmd` and may be missing from PATH in tool shells.

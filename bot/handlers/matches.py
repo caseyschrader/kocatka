@@ -154,7 +154,7 @@ async def on_chat_text(message: Message, state: FSMContext, session: AsyncSessio
         template.format(name=name, text=message.text),
         keyboards.reply(match_id, sender_id),
     )
-    await matching.record_message(session, match_id, sender_id, len(message.text))
+    await matching.record_message(session, match_id, sender_id, other_id, len(message.text))
     if not delivered:
         await message.answer(strings.NOT_DELIVERED)
     elif is_first:

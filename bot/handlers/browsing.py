@@ -9,7 +9,7 @@ from bot import keyboards, strings
 from bot.db.models import Profile
 from bot.handlers.matches import announce_match
 from bot.handlers.profile import format_card
-from bot.services import browsing, matching, profiles, safety
+from bot.services import browsing, events, matching, profiles, safety
 
 router = Router()
 
@@ -19,6 +19,8 @@ async def show_next(message: Message, session: AsyncSession, viewer: Profile) ->
     if candidate is None:
         await message.answer(strings.NO_MORE_PROFILES)
         return
+    events.log_event(session, "profile_viewed", viewer.user_id, candidate.user_id)
+    await session.commit()
 
     card = format_card(candidate)
     buttons = keyboards.swipe(candidate.user_id)

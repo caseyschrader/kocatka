@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import keyboards, strings
 from bot.handlers.profile import send_profile_card
-from bot.services import profiles
+from bot.services import events, profiles
 
 router = Router()
 
@@ -45,6 +45,12 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+async def _signup_stopped(session: AsyncSession, reason: str) -> None:
+    """Logged without a user id: the person has not consented, so nothing identifies them."""
+    events.log_event(session, "signup_stopped", reason=reason)
+    await session.commit()
+
+
 async def _close_keyboard(callback: CallbackQuery) -> None:
     """Stops the button spinner and removes the buttons so they cannot be reused."""
     await callback.answer()
@@ -64,6 +70,8 @@ async def cmd_start(message: Message, state: FSMContext, session: AsyncSession) 
 
     await state.clear()
     await state.set_state(Onboarding.adult)
+    events.log_event(session, "signup_started")  # no user id before consent
+    await session.commit()
     await message.answer(strings.WELCOME)
     await message.answer(strings.ASK_ADULT, reply_markup=keyboards.adult())
 
@@ -91,12 +99,14 @@ async def on_redo(callback: CallbackQuery, state: FSMContext, session: AsyncSess
 
 
 @router.message(Command("cancel"))
-async def cmd_cancel(message: Message, state: FSMContext) -> None:
+async def cmd_cancel(message: Message, state: FSMContext, session: AsyncSession) -> None:
     if await state.get_state() is None:
         await message.answer(strings.NOTHING_TO_CANCEL)
         return
     is_redo = (await state.get_data()).get("redo", False)
     await state.clear()
+    if not is_redo:
+        await _signup_stopped(session, "cancelled")
     await message.answer(strings.REDO_CANCELLED if is_redo else strings.CANCELLED)
 
 
@@ -104,10 +114,11 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
 
 
 @router.callback_query(Onboarding.adult, F.data.in_({"adult:yes", "adult:no"}))
-async def on_adult(callback: CallbackQuery, state: FSMContext) -> None:
+async def on_adult(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     await _close_keyboard(callback)
     if callback.data == "adult:no":
         await state.clear()
+        await _signup_stopped(session, "underage")
         await callback.message.answer(strings.UNDERAGE)
         return
     await state.update_data(adult_confirmed_at=_now())
@@ -116,10 +127,11 @@ async def on_adult(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.callback_query(Onboarding.consent, F.data.in_({"consent:yes", "consent:no"}))
-async def on_consent(callback: CallbackQuery, state: FSMContext) -> None:
+async def on_consent(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     await _close_keyboard(callback)
     if callback.data == "consent:no":
         await state.clear()
+        await _signup_stopped(session, "no_consent")
         await callback.message.answer(strings.CONSENT_DECLINED)
         return
     await state.update_data(consented_at=_now())
@@ -148,13 +160,14 @@ async def on_preference(callback: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.message(Onboarding.age, F.text)
-async def on_age(message: Message, state: FSMContext) -> None:
+async def on_age(message: Message, state: FSMContext, session: AsyncSession) -> None:
     age = profiles.parse_age(message.text)
     if age is None:
         await message.answer(strings.AGE_INVALID)
         return
     if age < profiles.MIN_AGE:
         await state.clear()
+        await _signup_stopped(session, "underage")
         await message.answer(strings.UNDERAGE)
         return
     await state.update_data(age=age)
@@ -184,11 +197,13 @@ async def on_age_range_not_text(message: Message) -> None:
 
 
 @router.callback_query(Onboarding.city, F.data.in_({"city:spb", "city:other"}))
-async def on_city(callback: CallbackQuery, state: FSMContext) -> None:
+async def on_city(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
     await _close_keyboard(callback)
     if callback.data == "city:other":
         is_redo = (await state.get_data()).get("redo", False)
         await state.clear()
+        if not is_redo:
+            await _signup_stopped(session, "other_city")
         await callback.message.answer(
             strings.CITY_NOT_SUPPORTED_REDO if is_redo else strings.CITY_NOT_SUPPORTED
         )
