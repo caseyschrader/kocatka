@@ -85,6 +85,14 @@ Profiles are stored in a local SQLite file, `kocatka.db`, created on first run. 
 * Tables are created automatically but never altered. Until Alembic arrives with PostgreSQL, a milestone that changes the tables means deleting `kocatka.db`.
 * Answers given during onboarding live in memory until the last step, so restarting the bot mid-onboarding loses them. The user sends `/start` again.
 
+## Quick stats
+
+```powershell
+.venv\Scripts\python scripts\stats.py
+```
+
+Prints counts of profiles, likes, matches, messages and bans. Read-only, safe to run while the bot is running.
+
 ## Test
 
 ```powershell
