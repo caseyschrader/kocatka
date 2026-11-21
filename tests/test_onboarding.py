@@ -245,11 +245,9 @@ async def test_profile_command(chat):
     assert "Аня, 27" in chat.photos[-1].caption
 
 
-async def test_two_users_do_not_mix(sessionmaker):
-    from tests.conftest import FakeChat
-
-    anya = FakeChat(sessionmaker, first_name="Аня")
-    oleg = FakeChat(sessionmaker, first_name="Олег")
+async def test_two_users_do_not_mix(sessionmaker, new_chat):
+    anya = new_chat("Аня")
+    oleg = new_chat("Олег")
 
     await go_to_photos(anya, age="27", bio="Аня о себе")
     await go_to_photos(oleg, age="33", bio="Олег о себе")

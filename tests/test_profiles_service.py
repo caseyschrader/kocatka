@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from sqlalchemy import func, select
 
-from bot.db.models import Photo, Profile, Swipe, User
+from bot.db.models import Match, Photo, Profile, Swipe, User
 from bot.services import profiles
 
 NOW = datetime(2026, 11, 21, tzinfo=timezone.utc)
@@ -96,6 +96,8 @@ async def test_delete_user_data_removes_everything(sessionmaker):
             Swipe(viewer_id=1, target_id=2, action="like"),
             Swipe(viewer_id=2, target_id=1, action="pass"),
             Swipe(viewer_id=2, target_id=3, action="like"),
+            Match(user_a=1, user_b=2, status="pending", created_at=NOW, expires_at=NOW),
+            Match(user_a=2, user_b=3, status="pending", created_at=NOW, expires_at=NOW),
         ])
         await session.commit()
 
@@ -106,6 +108,7 @@ async def test_delete_user_data_removes_everything(sessionmaker):
             assert await session.scalar(select(func.count()).select_from(model)) == 2
         # Swipes made by and about the user are gone. Other people's remain.
         assert await session.scalar(select(func.count()).select_from(Swipe)) == 1
+        assert await session.scalar(select(func.count()).select_from(Match)) == 1
         assert await profiles.get_profile(session, 1) is None
         assert await profiles.get_profile(session, 2) is not None
 

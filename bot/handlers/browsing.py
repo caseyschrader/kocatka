@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot import keyboards, strings
 from bot.db.models import Profile
+from bot.handlers.matches import announce_match
 from bot.handlers.profile import format_card
-from bot.services import browsing, profiles
+from bot.services import browsing, matching, profiles
 
 router = Router()
 
@@ -62,4 +63,8 @@ async def on_swipe(callback: CallbackQuery, session: AsyncSession, match) -> Non
 
     await callback.answer()
     await callback.message.edit_reply_markup(reply_markup=None)
+    if target_exists and action == browsing.LIKE:
+        match = await matching.create_match_if_mutual(session, viewer.user_id, target_id)
+        if match is not None:
+            await announce_match(callback.bot, session, match)
     await show_next(callback.message, session, viewer)

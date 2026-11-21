@@ -71,5 +71,7 @@ users, profiles, photos, swipes (viewer, target, action, ts), matches (user_a, u
 * Handlers live in `bot/handlers/`, one router per feature. Register new routers in `bot/handlers/__init__.py`, before the fallback router.
 * Rules and database queries live in `bot/services/` and import nothing from aiogram.
 * Handlers receive a database session as the `session` argument (see `DbSessionMiddleware`).
-* Tests drive the real dispatcher through `FakeChat` in `tests/conftest.py`: `send_text`, `send_photo`, `press`.
+* Tests drive the real dispatcher through `FakeChat` in `tests/conftest.py`: `send_text`, `send_photo`, `press`. All users in a test share one fake bot; each `FakeChat` sees only calls to its own chat.
+* SQLite returns datetimes without a timezone. Wrap loaded values in `as_utc()` before comparing in Python, and pass `synchronize_session=False` on bulk updates that filter on datetimes.
+* Time-dependent services take an optional `now` argument so tests can move the clock.
 * On Windows, git is at `C:\Program Files\Git\cmd` and may be missing from PATH in tool shells.

@@ -10,6 +10,11 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def as_utc(value: datetime) -> datetime:
+    """SQLite hands datetimes back without a timezone. They are always UTC."""
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -66,3 +71,19 @@ class Swipe(Base):
     target_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
     action: Mapped[str] = mapped_column(String(8))  # "like" | "pass"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Match(Base):
+    """A mutual like. user_a is always the smaller id, so each pair has one row."""
+
+    __tablename__ = "matches"
+    __table_args__ = (UniqueConstraint("user_a", "user_b"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_a: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
+    user_b: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16))  # "pending" | "active" | "expired"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    first_sender: Mapped[int | None] = mapped_column(BigInteger)

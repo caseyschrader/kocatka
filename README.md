@@ -2,7 +2,7 @@
 
 Kocatka (Косатка) is a Telegram bot to test whether women-first messaging has traction. See `CLAUDE.md` for the full brief and milestones.
 
-Status: milestone 3 (browsing with Like and Pass).
+Status: milestone 4 (matching and the women-first window).
 
 ## Commands
 
@@ -12,6 +12,15 @@ Status: milestone 3 (browsing with Like and Pass).
 | `/cancel` | Abandons onboarding. Nothing is saved |
 | `/profile` | Shows your profile as others will see it |
 | `/browse` | Shows profiles one at a time with Like and Pass buttons |
+| `/matches` | Lists your pending and active matches, with a Write button when it is your turn |
+
+## Matches and the women-first rule
+
+* A like in both directions creates a match with a 24 hour window.
+* Woman and man: only the woman can send the first message. The man is told she has 24 hours.
+* Same gender: either person can start. Whoever sends first wins, the other is told the conversation has started.
+* If nobody writes in time, the match expires and both are told. A background check runs every minute inside the bot, and once at startup.
+* For now only the first message is relayed. Replies come in milestone 5.
 
 ## How browsing picks a profile
 
@@ -72,6 +81,7 @@ Profiles are stored in a local SQLite file, `kocatka.db`, created on first run. 
 | `bot/config.py` | Settings from `.env` |
 | `bot/strings.py` | All Russian user-facing text |
 | `bot/keyboards.py` | Inline button layouts |
+| `bot/jobs.py` | Background work: match expiry, startup catch-up |
 | `bot/handlers/` | Telegram handlers, one file per feature |
 | `bot/services/` | Business rules and queries, no Telegram code |
 | `bot/db/` | Tables and database session setup |

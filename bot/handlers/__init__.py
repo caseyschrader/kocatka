@@ -1,6 +1,6 @@
 from aiogram import Router
 
-from bot.handlers import browsing, fallback, onboarding, profile
+from bot.handlers import browsing, fallback, matches, onboarding, profile
 
 
 def build_router() -> Router:
@@ -8,6 +8,7 @@ def build_router() -> Router:
     router = Router()
     router.include_router(profile.router)
     router.include_router(browsing.router)
+    router.include_router(matches.router)  # before onboarding, for its own /cancel
     router.include_router(onboarding.router)
     router.include_router(fallback.router)  # always last
     return router

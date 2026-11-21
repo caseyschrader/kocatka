@@ -50,14 +50,17 @@ class FakeSession(BaseSession):
 
 
 class FakeChat:
-    """One Telegram user talking to the bot."""
+    """One Telegram user talking to the bot.
 
-    def __init__(self, sessionmaker, first_name: str = "Аня") -> None:
+    All users in a test share one bot and one fake network, like in real life.
+    Each user only sees the calls addressed to their own chat.
+    """
+
+    def __init__(self, sessionmaker, bot: Bot, first_name: str = "Аня") -> None:
         self.user_id = next(_ids)
         self.first_name = first_name
         self.sessionmaker = sessionmaker
-        self.network = FakeSession()
-        self.bot = Bot(token="123456:TEST", session=self.network)
+        self.bot = bot
 
     # --- what the user does ---
 
@@ -101,8 +104,13 @@ class FakeChat:
     # --- what the bot answered ---
 
     @property
+    def calls(self) -> list:
+        """Every call the bot made towards this user's chat."""
+        return [c for c in self.bot.session.calls if getattr(c, "chat_id", None) == self.user_id]
+
+    @property
     def texts(self) -> list[str]:
-        return [call.text for call in self.network.calls if isinstance(call, SendMessage)]
+        return [call.text for call in self.calls if isinstance(call, SendMessage)]
 
     @property
     def last_text(self) -> str:
@@ -110,24 +118,28 @@ class FakeChat:
 
     @property
     def photos(self) -> list[SendPhoto]:
-        return [call for call in self.network.calls if isinstance(call, SendPhoto)]
+        return [call for call in self.calls if isinstance(call, SendPhoto)]
 
     @property
     def albums(self) -> list[SendMediaGroup]:
-        return [call for call in self.network.calls if isinstance(call, SendMediaGroup)]
+        return [call for call in self.calls if isinstance(call, SendMediaGroup)]
+
+    @property
+    def buttons(self) -> list[str]:
+        """callback_data of every button sent to this user, oldest first."""
+        found = []
+        for call in self.calls:
+            markup = getattr(call, "reply_markup", None)
+            if markup is not None and isinstance(call, (SendMessage, SendPhoto)):
+                found += [b.callback_data for row in markup.inline_keyboard for b in row]
+        return found
 
     @property
     def shown_ids(self) -> list[int]:
         """User ids of every browsing card shown, read from the Like buttons."""
-        ids = []
-        for call in self.network.calls:
-            markup = getattr(call, "reply_markup", None)
-            if markup is None:
-                continue
-            data = markup.inline_keyboard[0][0].callback_data
-            if data.startswith("swipe:like:"):
-                ids.append(int(data.split(":")[2]))
-        return ids
+        return [
+            int(data.split(":")[2]) for data in self.buttons if data.startswith("swipe:like:")
+        ]
 
     async def register(
         self,
@@ -182,11 +194,16 @@ async def sessionmaker(tmp_path):
 
 
 @pytest.fixture
-def chat(sessionmaker) -> FakeChat:
-    return FakeChat(sessionmaker)
+def bot() -> Bot:
+    return Bot(token="123456:TEST", session=FakeSession())
 
 
 @pytest.fixture
-def new_chat(sessionmaker):
+def chat(sessionmaker, bot) -> FakeChat:
+    return FakeChat(sessionmaker, bot)
+
+
+@pytest.fixture
+def new_chat(sessionmaker, bot):
     """Factory for tests that need several users: new_chat("Олег")."""
-    return lambda first_name: FakeChat(sessionmaker, first_name=first_name)
+    return lambda first_name: FakeChat(sessionmaker, bot, first_name=first_name)

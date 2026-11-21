@@ -54,6 +54,10 @@ def swipe(target_id: int) -> InlineKeyboardMarkup:
     )
 
 
+def write(match_id: int) -> InlineKeyboardMarkup:
+    return _keyboard([(strings.BTN_WRITE, f"write:{match_id}")])
+
+
 def redo() -> InlineKeyboardMarkup:
     return _keyboard([(strings.BTN_REDO, "profile:redo")])
 
