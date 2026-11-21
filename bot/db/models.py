@@ -82,8 +82,55 @@ class Match(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_a: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
     user_b: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), index=True)
-    status: Mapped[str] = mapped_column(String(16))  # "pending" | "active" | "expired"
+    # "pending" | "active" | "expired" | "closed" (blocked, reported or banned)
+    status: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     first_sender: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class ChatMessage(Base):
+    """One relayed message. The text itself is never stored, only that it happened."""
+
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    match_id: Mapped[int] = mapped_column(Integer, ForeignKey("matches.id"), index=True)
+    sender_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    length: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Block(Base):
+    __tablename__ = "blocks"
+    __table_args__ = (UniqueConstraint("blocker_id", "blocked_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    blocker_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    blocked_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Report(Base):
+    __tablename__ = "reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reporter_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    reported_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    reason: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Ban(Base):
+    """Kept even after /delete_me, so a banned person cannot simply sign up again.
+
+    Holds only the Telegram id. Flagged for legal review.
+    """
+
+    __tablename__ = "bans"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=False)
+    banned_by: Mapped[int] = mapped_column(BigInteger)
+    reason: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

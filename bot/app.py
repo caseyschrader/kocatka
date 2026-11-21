@@ -5,12 +5,15 @@ from aiogram.fsm.storage.memory import SimpleEventIsolation
 
 from bot.db.session import DbSessionMiddleware
 from bot.handlers import build_router
+from bot.middlewares import BanMiddleware
 
 
 def build_dispatcher() -> Dispatcher:
     # SimpleEventIsolation handles one update per user at a time. Without it,
     # an album of three photos would be processed in parallel and could race.
     dispatcher = Dispatcher(events_isolation=SimpleEventIsolation())
+    # Outer middlewares run in the order they are added: session first, then bans.
     dispatcher.update.outer_middleware(DbSessionMiddleware())
+    dispatcher.update.outer_middleware(BanMiddleware())
     dispatcher.include_router(build_router())
     return dispatcher

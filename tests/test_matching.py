@@ -135,16 +135,16 @@ async def test_same_gender_first_writer_wins(new_chat, sessionmaker):
     await lena.send_text("Привет от Лены")
     await maria.send_text("Привет от Марии")
 
-    assert maria.texts[-2] == strings.FIRST_MESSAGE_RECEIVED.format(
+    assert strings.FIRST_MESSAGE_RECEIVED.format(
         name="Лена", text="Привет от Лены"
-    )
-    assert maria.last_text == strings.CANNOT_WRITE_ALREADY_STARTED
-    assert "Привет от Марии" not in " ".join(lena.texts)
+    ) in maria.texts
+    # Лена started first. Мария's message still arrives, as an ordinary reply.
+    assert lena.last_text == strings.RELAYED_MESSAGE.format(name="Мария", text="Привет от Марии")
     match, = await all_matches(sessionmaker)
     assert match.first_sender == lena.user_id
 
 
-async def test_writing_twice_is_refused(new_chat):
+async def test_write_button_after_start_reopens_the_chat(new_chat):
     anya, oleg = await woman_and_man(new_chat)
     await like_each_other(oleg, anya)
     await anya.press(write_button(anya))
@@ -152,7 +152,7 @@ async def test_writing_twice_is_refused(new_chat):
 
     await anya.press(write_button(anya))
 
-    assert anya.last_text == strings.CANNOT_WRITE_ALREADY_STARTED
+    assert anya.last_text == strings.CHAT_OPENED.format(name="Олег")
 
 
 async def test_cancel_while_writing(new_chat, sessionmaker):
@@ -161,7 +161,7 @@ async def test_cancel_while_writing(new_chat, sessionmaker):
     await anya.press(write_button(anya))
     await anya.send_text("/cancel")
 
-    assert anya.last_text == strings.WRITE_CANCELLED
+    assert anya.last_text == strings.CHAT_LEFT
     await anya.send_text("Привет")
     assert anya.last_text == strings.UNKNOWN
     match, = await all_matches(sessionmaker)
@@ -183,7 +183,7 @@ async def test_too_long_first_message(new_chat):
     await anya.press(write_button(anya))
     await anya.send_text("а" * 1001)
 
-    assert anya.last_text == strings.FIRST_MESSAGE_TOO_LONG
+    assert anya.last_text == strings.MESSAGE_TOO_LONG
     await anya.send_text("Привет")
     assert anya.last_text == strings.FIRST_MESSAGE_SENT
 

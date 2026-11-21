@@ -13,7 +13,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from bot.db.models import Match, Profile, Swipe, as_utc, utcnow
+from bot.db.models import ChatMessage, Match, Profile, Swipe, as_utc, utcnow
 from bot.services.browsing import LIKE
 
 MATCH_WINDOW = timedelta(hours=24)
@@ -21,13 +21,15 @@ MATCH_WINDOW = timedelta(hours=24)
 PENDING = "pending"
 ACTIVE = "active"
 EXPIRED = "expired"
+CLOSED = "closed"  # ended by a block, report or ban
 
-# Outcomes of trying to write the first message.
+# Outcomes of trying to write.
 OK = "ok"
 NOT_FOUND = "not_found"
 NOT_ALLOWED = "not_allowed"
 TOO_LATE = "too_late"
 ALREADY_STARTED = "already_started"
+UNAVAILABLE = "unavailable"
 
 
 def other_user(match, user_id: int) -> int:
@@ -132,6 +134,8 @@ async def check_can_start(
     match = await get_match(session, match_id)
     if match is None or user_id not in (match.user_a, match.user_b):
         return NOT_FOUND, None
+    if match.status == CLOSED:
+        return UNAVAILABLE, match
     if match.status == ACTIVE:
         return ALREADY_STARTED, match
     if match.status == EXPIRED or as_utc(match.expires_at) <= now:
@@ -139,6 +143,24 @@ async def check_can_start(
     if user_id not in await allowed_starters(session, match):
         return NOT_ALLOWED, match
     return OK, match
+
+
+async def check_can_chat(
+    session: AsyncSession, match_id: int, user_id: int, now: datetime | None = None
+) -> tuple[str, Match | None]:
+    """OK if the conversation is running, or if this user may start it now."""
+    outcome, match = await check_can_start(session, match_id, user_id, now)
+    if outcome == ALREADY_STARTED:
+        return OK, match
+    return outcome, match
+
+
+async def record_message(
+    session: AsyncSession, match_id: int, sender_id: int, length: int
+) -> None:
+    """Notes that a message was relayed. The text is not stored."""
+    session.add(ChatMessage(match_id=match_id, sender_id=sender_id, length=length))
+    await session.commit()
 
 
 async def start_conversation(

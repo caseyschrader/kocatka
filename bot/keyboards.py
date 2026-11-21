@@ -45,17 +45,67 @@ def city() -> InlineKeyboardMarkup:
     )
 
 
+def _safety_row(user_id: int) -> list[tuple[str, str]]:
+    """Report and Block, shown on every profile and conversation."""
+    return [
+        (strings.BTN_REPORT, f"report:{user_id}"),
+        (strings.BTN_BLOCK, f"block:{user_id}"),
+    ]
+
+
 def swipe(target_id: int) -> InlineKeyboardMarkup:
     return _keyboard(
         [
             (strings.BTN_LIKE, f"swipe:like:{target_id}"),
             (strings.BTN_PASS, f"swipe:pass:{target_id}"),
+        ],
+        _safety_row(target_id),
+    )
+
+
+# All chat entry buttons send "write:<match id>". The handler decides whether
+# that means writing the first message or continuing the conversation.
+
+
+def write(match_id: int, other_id: int) -> InlineKeyboardMarkup:
+    return _keyboard([(strings.BTN_WRITE, f"write:{match_id}")], _safety_row(other_id))
+
+
+def open_chat(match_id: int, other_id: int) -> InlineKeyboardMarkup:
+    return _keyboard([(strings.BTN_OPEN_CHAT, f"write:{match_id}")], _safety_row(other_id))
+
+
+def reply(match_id: int, other_id: int) -> InlineKeyboardMarkup:
+    return _keyboard([(strings.BTN_REPLY, f"write:{match_id}")], _safety_row(other_id))
+
+
+def safety(user_id: int) -> InlineKeyboardMarkup:
+    return _keyboard(_safety_row(user_id))
+
+
+def report_reasons(user_id: int) -> InlineKeyboardMarkup:
+    return _keyboard(
+        *[
+            [(label, f"reportwhy:{user_id}:{reason}")]
+            for reason, label in strings.REPORT_REASON_LABELS.items()
         ]
     )
 
 
-def write(match_id: int) -> InlineKeyboardMarkup:
-    return _keyboard([(strings.BTN_WRITE, f"write:{match_id}")])
+def block_confirm(user_id: int) -> InlineKeyboardMarkup:
+    return _keyboard(
+        [(strings.BTN_BLOCK_YES, f"blockyes:{user_id}"), (strings.BTN_BLOCK_NO, "blockno")]
+    )
+
+
+def delete_confirm() -> InlineKeyboardMarkup:
+    return _keyboard(
+        [(strings.BTN_DELETE_YES, "delete:yes"), (strings.BTN_DELETE_NO, "delete:no")]
+    )
+
+
+def ban(user_id: int) -> InlineKeyboardMarkup:
+    return _keyboard([(strings.BTN_BAN, f"ban:{user_id}")])
 
 
 def redo() -> InlineKeyboardMarkup:

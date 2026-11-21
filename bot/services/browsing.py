@@ -4,7 +4,7 @@ from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from bot.db.models import Profile, Swipe
+from bot.db.models import Ban, Block, Profile, Swipe
 
 LIKE = "like"
 PASS = "pass"
@@ -30,6 +30,9 @@ async def next_candidate(session: AsyncSession, viewer: Profile) -> Profile | No
     candidate's filters too. Otherwise a like could never become a match.
     """
     already_swiped = select(Swipe.target_id).where(Swipe.viewer_id == viewer.user_id)
+    blocked_by_viewer = select(Block.blocked_id).where(Block.blocker_id == viewer.user_id)
+    blocked_viewer = select(Block.blocker_id).where(Block.blocked_id == viewer.user_id)
+    banned = select(Ban.user_id)
     liked_viewer = (
         exists()
         .where(
@@ -54,6 +57,10 @@ async def next_candidate(session: AsyncSession, viewer: Profile) -> Profile | No
             Profile.age_max >= viewer.age,
             # Never show a profile the viewer has already decided on.
             Profile.user_id.not_in(already_swiped),
+            # Blocks work both ways, and banned people are hidden.
+            Profile.user_id.not_in(blocked_by_viewer),
+            Profile.user_id.not_in(blocked_viewer),
+            Profile.user_id.not_in(banned),
         )
         # People who already liked the viewer come first, the rest in random order.
         .order_by(liked_viewer.desc(), func.random())

@@ -8,7 +8,7 @@ from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from bot.db.models import Match, Photo, Profile, Swipe, User
+from bot.db.models import Block, ChatMessage, Match, Photo, Profile, Report, Swipe, User
 
 MIN_AGE = 18
 MAX_AGE = 99
@@ -85,9 +85,22 @@ async def get_profile(session: AsyncSession, user_id: int) -> Profile | None:
 
 
 async def delete_user_data(session: AsyncSession, user_id: int) -> None:
-    """Removes every row we hold about a user. Does not commit."""
+    """Removes every row we hold about a user. Does not commit.
+
+    The only thing kept is a ban, if there is one (see models.Ban).
+    """
+    their_matches = select(Match.id).where(
+        or_(Match.user_a == user_id, Match.user_b == user_id)
+    )
+    await session.execute(delete(ChatMessage).where(ChatMessage.match_id.in_(their_matches)))
     await session.execute(
         delete(Match).where(or_(Match.user_a == user_id, Match.user_b == user_id))
+    )
+    await session.execute(
+        delete(Block).where(or_(Block.blocker_id == user_id, Block.blocked_id == user_id))
+    )
+    await session.execute(
+        delete(Report).where(or_(Report.reporter_id == user_id, Report.reported_id == user_id))
     )
     await session.execute(
         delete(Swipe).where(or_(Swipe.viewer_id == user_id, Swipe.target_id == user_id))

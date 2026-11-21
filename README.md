@@ -2,7 +2,7 @@
 
 Kocatka (Косатка) is a Telegram bot to test whether women-first messaging has traction. See `CLAUDE.md` for the full brief and milestones.
 
-Status: milestone 4 (matching and the women-first window).
+Status: milestone 5 (chat relay, report and block, admin ban, /delete_me).
 
 ## Commands
 
@@ -12,7 +12,26 @@ Status: milestone 4 (matching and the women-first window).
 | `/cancel` | Abandons onboarding. Nothing is saved |
 | `/profile` | Shows your profile as others will see it |
 | `/browse` | Shows profiles one at a time with Like and Pass buttons |
-| `/matches` | Lists your pending and active matches, with a Write button when it is your turn |
+| `/matches` | Lists your pending and active matches, with a Write or Open chat button |
+| `/stop` | Leaves the chat you are in |
+| `/delete_me` | Deletes your account and all your data, after a confirmation |
+| `/ban <id> [reason]` | Admins only. Bans a user and ends their conversations |
+| `/unban <id>` | Admins only |
+
+## Chat
+
+A Write, Reply or Open chat button puts you in a chat with that person. Everything you type goes to them through the bot until you send `/stop`. Text only for now. Only the fact that a message was sent (who, when, length) is stored, never the text.
+
+## Safety
+
+* Every profile card, match message and relayed message has Report and Block buttons.
+* Block (after a confirmation) hides both people from each other and ends their match or conversation.
+* Report asks for a reason, also blocks, and sends the report with the profile and a Ban button to every admin in `ADMIN_IDS`.
+* Banned users are stopped at every message, hidden from browsing, and their conversations end. They can still run `/delete_me`. The ban itself (only the Telegram id) is kept, so they cannot sign up again.
+
+## Admins
+
+Set `ADMIN_IDS` in `.env` to numeric Telegram user ids, comma-separated. Not usernames: message `@userinfobot` in Telegram to see your id. The bot refuses to start if the value is not numeric.
 
 ## Matches and the women-first rule
 
@@ -20,7 +39,7 @@ Status: milestone 4 (matching and the women-first window).
 * Woman and man: only the woman can send the first message. The man is told she has 24 hours.
 * Same gender: either person can start. Whoever sends first wins, the other is told the conversation has started.
 * If nobody writes in time, the match expires and both are told. A background check runs every minute inside the bot, and once at startup.
-* For now only the first message is relayed. Replies come in milestone 5.
+* After the first message, both people chat freely through the bot.
 
 ## How browsing picks a profile
 
@@ -82,6 +101,7 @@ Profiles are stored in a local SQLite file, `kocatka.db`, created on first run. 
 | `bot/strings.py` | All Russian user-facing text |
 | `bot/keyboards.py` | Inline button layouts |
 | `bot/jobs.py` | Background work: match expiry, startup catch-up |
+| `bot/middlewares.py` | Ban check before every handler |
 | `bot/handlers/` | Telegram handlers, one file per feature |
 | `bot/services/` | Business rules and queries, no Telegram code |
 | `bot/db/` | Tables and database session setup |

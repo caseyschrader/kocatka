@@ -74,4 +74,6 @@ users, profiles, photos, swipes (viewer, target, action, ts), matches (user_a, u
 * Tests drive the real dispatcher through `FakeChat` in `tests/conftest.py`: `send_text`, `send_photo`, `press`. All users in a test share one fake bot; each `FakeChat` sees only calls to its own chat.
 * SQLite returns datetimes without a timezone. Wrap loaded values in `as_utc()` before comparing in Python, and pass `synchronize_session=False` on bulk updates that filter on datetimes.
 * Time-dependent services take an optional `now` argument so tests can move the clock.
+* Handlers get `admin_ids` (list of ints) as an argument, passed to `start_polling` and to `feed_raw_update` in tests. The `admin` fixture makes a test user an admin.
+* Relayed message text is never stored, only metadata in `messages`. `delete_user_data` must remove every table that mentions the user, except `bans`.
 * On Windows, git is at `C:\Program Files\Git\cmd` and may be missing from PATH in tool shells.

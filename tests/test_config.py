@@ -17,6 +17,17 @@ def test_settings_parse_admin_ids():
     assert settings.admin_id_list == [1, 22, 333]
 
 
+def test_settings_accept_quoted_admin_ids():
+    settings = Settings(_env_file=None, bot_token="x", admin_ids='"123"')
+
+    assert settings.admin_id_list == [123]
+
+
+def test_settings_reject_usernames_as_admin_ids():
+    with pytest.raises(ValidationError, match="numeric Telegram user ids"):
+        Settings(_env_file=None, bot_token="x", admin_ids="someusername")
+
+
 def test_settings_default_database_is_local_sqlite(monkeypatch):
     monkeypatch.delenv("DATABASE_URL", raising=False)
 

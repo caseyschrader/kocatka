@@ -56,11 +56,14 @@ class FakeChat:
     Each user only sees the calls addressed to their own chat.
     """
 
-    def __init__(self, sessionmaker, bot: Bot, first_name: str = "Аня") -> None:
+    def __init__(
+        self, sessionmaker, bot: Bot, first_name: str = "Аня", admins: list[int] | None = None
+    ) -> None:
         self.user_id = next(_ids)
         self.first_name = first_name
         self.sessionmaker = sessionmaker
         self.bot = bot
+        self.admins = admins if admins is not None else []
 
     # --- what the user does ---
 
@@ -181,7 +184,7 @@ class FakeChat:
     async def _feed(self, update: dict) -> None:
         update["update_id"] = next(_ids)
         await _dispatcher.feed_raw_update(
-            self.bot, update, sessionmaker=self.sessionmaker
+            self.bot, update, sessionmaker=self.sessionmaker, admin_ids=self.admins
         )
 
 
@@ -199,11 +202,24 @@ def bot() -> Bot:
 
 
 @pytest.fixture
-def chat(sessionmaker, bot) -> FakeChat:
-    return FakeChat(sessionmaker, bot)
+def admins() -> list[int]:
+    """Admin user ids, shared by every user in the test (like ADMIN_IDS in .env)."""
+    return []
 
 
 @pytest.fixture
-def new_chat(sessionmaker, bot):
+def chat(sessionmaker, bot, admins) -> FakeChat:
+    return FakeChat(sessionmaker, bot, admins=admins)
+
+
+@pytest.fixture
+def new_chat(sessionmaker, bot, admins):
     """Factory for tests that need several users: new_chat("Олег")."""
-    return lambda first_name: FakeChat(sessionmaker, bot, first_name=first_name)
+    return lambda first_name: FakeChat(sessionmaker, bot, first_name=first_name, admins=admins)
+
+
+@pytest.fixture
+def admin(new_chat, admins) -> FakeChat:
+    moderator = new_chat("Админ")
+    admins.append(moderator.user_id)
+    return moderator

@@ -9,7 +9,7 @@ from bot import keyboards, strings
 from bot.db.models import Profile
 from bot.handlers.matches import announce_match
 from bot.handlers.profile import format_card
-from bot.services import browsing, matching, profiles
+from bot.services import browsing, matching, profiles, safety
 
 router = Router()
 
@@ -43,16 +43,21 @@ async def cmd_browse(message: Message, session: AsyncSession) -> None:
     await show_next(message, session, viewer)
 
 
-@router.callback_query(F.data.regexp(r"^swipe:(like|pass):(\d+)$").as_("match"))
-async def on_swipe(callback: CallbackQuery, session: AsyncSession, match) -> None:
-    action, target_id = match.group(1), int(match.group(2))
+@router.callback_query(F.data.regexp(r"^swipe:(like|pass):(\d+)$").as_("found"))
+async def on_swipe(callback: CallbackQuery, session: AsyncSession, found) -> None:
+    action, target_id = found.group(1), int(found.group(2))
     viewer = await profiles.get_profile(session, callback.from_user.id)
     if viewer is None or target_id == viewer.user_id:
         await callback.answer(strings.STALE_BUTTON)
         return
 
-    # The other person may have deleted their account since the card was shown.
-    target_exists = await session.get(Profile, target_id) is not None
+    # Since the card was shown, the other person may have deleted their account,
+    # been banned, or one of the two may have blocked the other. Then skip it.
+    target_exists = (
+        await session.get(Profile, target_id) is not None
+        and not await safety.is_banned(session, target_id)
+        and not await safety.is_blocked_either_way(session, viewer.user_id, target_id)
+    )
     if target_exists:
         is_new = await browsing.record_swipe(session, viewer.user_id, target_id, action)
         if not is_new:
