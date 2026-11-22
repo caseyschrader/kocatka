@@ -52,7 +52,10 @@ async def main() -> None:
         # Polling: the bot asks Telegram for new messages. No public server needed.
         # Extra keyword arguments become available to middlewares and handlers.
         await dispatcher.start_polling(
-            bot, sessionmaker=sessionmaker, admin_ids=settings.admin_id_list
+            bot,
+            sessionmaker=sessionmaker,
+            admin_ids=settings.admin_id_list,
+            webapp_url=settings.webapp_url,
         )
     finally:
         expiry_task.cancel()

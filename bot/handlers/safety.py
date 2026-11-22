@@ -1,6 +1,6 @@
 """Report, block, /delete_me and admin bans."""
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -54,10 +54,18 @@ async def on_report_reason(
     await safety.report(session, reporter_id, reported_id, reason)
     await state.clear()  # leaves the chat if they were in one
     await callback.message.answer(strings.REPORT_SENT)
-    await _tell_admins(callback, session, admin_ids, reporter_id, reported_id, reason)
+    await tell_admins(callback.bot, session, admin_ids, reporter_id, reported_id, reason)
 
 
-async def _tell_admins(callback, session, admin_ids, reporter_id, reported_id, reason) -> None:
+async def tell_admins(
+    bot: Bot,
+    session: AsyncSession,
+    admin_ids: list[int],
+    reporter_id: int,
+    reported_id: int,
+    reason: str,
+) -> None:
+    """Sends a new report to every admin, with a Ban button. Used by the Mini App too."""
     total = await session.scalar(
         select(func.count()).select_from(Report).where(Report.reported_id == reported_id)
     )
@@ -71,10 +79,10 @@ async def _tell_admins(callback, session, admin_ids, reporter_id, reported_id, r
     )
     profile = await profiles.get_profile(session, reported_id)
     for admin_id in admin_ids:
-        await notify(callback.bot, admin_id, text, keyboards.ban(reported_id))
+        await notify(bot, admin_id, text, keyboards.ban(reported_id))
         if profile is not None:
             try:
-                await callback.bot.send_photo(
+                await bot.send_photo(
                     admin_id, profile.photos[0].file_id, caption=format_card(profile)
                 )
             except Exception:  # the report itself already went through

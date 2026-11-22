@@ -147,6 +147,7 @@ Prints counts of profiles, likes, matches, messages and bans. Read-only, safe to
 | `bot/db/` | Tables and database session setup |
 | `webapp/server.py` | Mini App web server: login check and JSON API |
 | `webapp/auth.py` | Checks Telegram's signature on Mini App requests |
+| `webapp/photos.py` | Signed, hour-long photo links; fetches photos from Telegram without storing them |
 | `webapp/static/` | The Mini App page: HTML, JavaScript, CSS |
 | `Caddyfile` | HTTPS in front of the Mini App on the server |
 | `tests/` | pytest tests. `conftest.py` has a fake Telegram connection |

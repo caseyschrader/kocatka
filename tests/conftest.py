@@ -64,6 +64,8 @@ class FakeChat:
         self.sessionmaker = sessionmaker
         self.bot = bot
         self.admins = admins if admins is not None else []
+        # Like WEBAPP_URL in .env. Empty means no Mini App, as on the laptop.
+        self.webapp_url = ""
 
     # --- what the user does ---
 
@@ -134,7 +136,9 @@ class FakeChat:
         for call in self.calls:
             markup = getattr(call, "reply_markup", None)
             if markup is not None and isinstance(call, (SendMessage, SendPhoto)):
-                found += [b.callback_data for row in markup.inline_keyboard for b in row]
+                found += [
+                    b.callback_data for row in markup.inline_keyboard for b in row if b.callback_data
+                ]
         return found
 
     @property
@@ -184,7 +188,11 @@ class FakeChat:
     async def _feed(self, update: dict) -> None:
         update["update_id"] = next(_ids)
         await _dispatcher.feed_raw_update(
-            self.bot, update, sessionmaker=self.sessionmaker, admin_ids=self.admins
+            self.bot,
+            update,
+            sessionmaker=self.sessionmaker,
+            admin_ids=self.admins,
+            webapp_url=self.webapp_url,
         )
 
 

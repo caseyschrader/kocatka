@@ -230,14 +230,33 @@ COMMANDS = {
 # Text of the button next to the message field that opens the Mini App.
 WEBAPP_MENU_BUTTON = APP_NAME
 # Everything the Mini App page shows. The page loads this from /api/strings.
+# {name} is replaced by the page.
 WEBAPP = {
-    "hello": "Привет, {name}!",
-    "coming_soon": "Скоро здесь можно будет смотреть анкеты. Пока это делается в чате: /browse.",
+    "like": BTN_LIKE,
+    "pass": BTN_PASS,
+    "report": BTN_REPORT,
+    "block": BTN_BLOCK,
+    "cancel": "Отмена",
+    "ok": "Хорошо",
+    "report_title": ASK_REPORT_REASON,
+    "report_reasons": REPORT_REASON_LABELS,
+    "report_sent": "Спасибо, жалоба отправлена. Этот человек больше не увидит вас.",
+    "block_confirm": "Заблокировать {name}? Вы больше не увидите друг друга.",
+    "blocked": "{name} заблокирован(а).",
+    "match_title": "Это взаимно!",
+    "match": "{name} тоже ставит вам лайк. Подробности мы написали в чат с ботом.",
+    "match_to_chat": "Перейти в чат",
+    "match_keep_browsing": "Смотреть дальше",
+    "no_more": "Пока анкеты закончились. Загляните позже.",
     "no_profile": "Сначала создайте анкету в чате с ботом: /start.",
     "open_in_telegram": "Откройте приложение через кнопку в чате с ботом в Telegram.",
     "banned": BANNED,
     "error": "Что-то пошло не так. Закройте приложение и откройте его ещё раз.",
 }
+# /browse offers the Mini App when it is set up.
+BROWSE_IN_APP = "Смотреть анкеты удобнее в приложении. Или продолжайте здесь, в чате."
+BTN_OPEN_APP = "📱 Открыть приложение"
+BTN_BROWSE_IN_CHAT = "Смотреть в чате"
 
 # --- Fallbacks ---
 

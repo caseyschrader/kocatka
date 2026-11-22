@@ -9,7 +9,7 @@ from bot import keyboards, strings
 from bot.db.models import Profile
 from bot.handlers.matches import announce_match
 from bot.handlers.profile import format_card
-from bot.services import browsing, events, matching, profiles, safety
+from bot.services import browsing, events, matching, profiles
 
 router = Router()
 
@@ -37,12 +37,27 @@ async def show_next(message: Message, session: AsyncSession, viewer: Profile) ->
 
 
 @router.message(Command("browse"))
-async def cmd_browse(message: Message, session: AsyncSession) -> None:
+async def cmd_browse(message: Message, session: AsyncSession, webapp_url: str = "") -> None:
     viewer = await profiles.get_profile(session, message.from_user.id)
     if viewer is None:
         await message.answer(strings.NO_PROFILE)
         return
+    if webapp_url:
+        # Offer the Mini App first. Browsing in the chat stays one tap away.
+        await message.answer(strings.BROWSE_IN_APP, reply_markup=keyboards.open_app(webapp_url))
+        return
     await show_next(message, session, viewer)
+
+
+@router.callback_query(F.data == "browse:chat")
+async def on_browse_in_chat(callback: CallbackQuery, session: AsyncSession) -> None:
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    viewer = await profiles.get_profile(session, callback.from_user.id)
+    if viewer is None:
+        await callback.message.answer(strings.NO_PROFILE)
+        return
+    await show_next(callback.message, session, viewer)
 
 
 @router.callback_query(F.data.regexp(r"^swipe:(like|pass):(\d+)$").as_("found"))
@@ -55,11 +70,7 @@ async def on_swipe(callback: CallbackQuery, session: AsyncSession, found) -> Non
 
     # Since the card was shown, the other person may have deleted their account,
     # been banned, or one of the two may have blocked the other. Then skip it.
-    target_exists = (
-        await session.get(Profile, target_id) is not None
-        and not await safety.is_banned(session, target_id)
-        and not await safety.is_blocked_either_way(session, viewer.user_id, target_id)
-    )
+    target_exists = await browsing.can_swipe_on(session, viewer.user_id, target_id)
     if target_exists:
         is_new = await browsing.record_swipe(session, viewer.user_id, target_id, action)
         if not is_new:

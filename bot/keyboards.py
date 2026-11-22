@@ -1,6 +1,6 @@
 """Inline keyboards. Each button sends back a short code such as "gender:female"."""
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 from bot import strings
 
@@ -60,6 +60,16 @@ def swipe(target_id: int) -> InlineKeyboardMarkup:
             (strings.BTN_PASS, f"swipe:pass:{target_id}"),
         ],
         _safety_row(target_id),
+    )
+
+
+def open_app(webapp_url: str) -> InlineKeyboardMarkup:
+    """Opens the Mini App, or keeps browsing in the chat."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=strings.BTN_OPEN_APP, web_app=WebAppInfo(url=webapp_url))],
+            [InlineKeyboardButton(text=strings.BTN_BROWSE_IN_CHAT, callback_data="browse:chat")],
+        ]
     )
 
 

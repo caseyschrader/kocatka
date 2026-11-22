@@ -1,6 +1,6 @@
 """Candidate selection and swipes. No Telegram code here."""
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -71,10 +71,32 @@ async def next_candidate(session: AsyncSession, viewer: Profile) -> Profile | No
     return result.scalar_one_or_none()
 
 
+async def can_swipe_on(session: AsyncSession, viewer_id: int, target_id: int) -> bool:
+    """False if the target is the viewer, deleted their account, was banned, or
+    if either of the two blocked the other. Checked again at swipe time, because
+    any of these can happen while a card is on screen."""
+    if viewer_id == target_id or await session.get(Profile, target_id) is None:
+        return False
+    if await session.get(Ban, target_id) is not None:
+        return False
+    blocked = await session.scalar(
+        select(Block.id).where(
+            or_(
+                (Block.blocker_id == viewer_id) & (Block.blocked_id == target_id),
+                (Block.blocker_id == target_id) & (Block.blocked_id == viewer_id),
+            )
+        )
+    )
+    return blocked is None
+
+
 async def record_swipe(
-    session: AsyncSession, viewer_id: int, target_id: int, action: str
+    session: AsyncSession, viewer_id: int, target_id: int, action: str, **props
 ) -> bool:
-    """Saves a Like or Pass. Returns False if this pair was already decided."""
+    """Saves a Like or Pass. Returns False if this pair was already decided.
+
+    Extra keyword arguments go into the event's properties, for example source="app".
+    """
     if action not in ACTIONS:
         raise ValueError(f"unknown action: {action}")
     if viewer_id == target_id:
@@ -86,6 +108,6 @@ async def record_swipe(
     if existing is not None:
         return False
     session.add(Swipe(viewer_id=viewer_id, target_id=target_id, action=action))
-    log_event(session, action, viewer_id, target_id)
+    log_event(session, action, viewer_id, target_id, **props)
     await session.commit()
     return True
