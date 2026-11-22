@@ -225,6 +225,20 @@ COMMANDS = {
     "delete_me": "Удалить аккаунт и все данные",
 }
 
+# --- Mini App ---
+
+# Text of the button next to the message field that opens the Mini App.
+WEBAPP_MENU_BUTTON = APP_NAME
+# Everything the Mini App page shows. The page loads this from /api/strings.
+WEBAPP = {
+    "hello": "Привет, {name}!",
+    "coming_soon": "Скоро здесь можно будет смотреть анкеты. Пока это делается в чате: /browse.",
+    "no_profile": "Сначала создайте анкету в чате с ботом: /start.",
+    "open_in_telegram": "Откройте приложение через кнопку в чате с ботом в Telegram.",
+    "banned": BANNED,
+    "error": "Что-то пошло не так. Закройте приложение и откройте его ещё раз.",
+}
+
 # --- Fallbacks ---
 
 STALE_BUTTON = "Эта кнопка больше не активна."

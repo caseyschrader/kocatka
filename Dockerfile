@@ -13,6 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY bot ./bot
 COPY analytics ./analytics
 COPY scripts ./scripts
+COPY webapp ./webapp
 
 # Run as an ordinary user, not root. Id 1000 matches the first user on the server.
 RUN useradd --uid 1000 --create-home kocatka

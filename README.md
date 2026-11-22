@@ -77,6 +77,20 @@ Browsing needs at least two profiles. You can get a second one by asking a frien
 
 Then open your bot in Telegram and send `/start`. Stop the bot with Ctrl+C.
 
+## Mini App
+
+The bot also runs a small web server for the Telegram Mini App (`webapp/`), on http://127.0.0.1:8080.
+Telegram only opens Mini Apps over HTTPS, so inside Telegram it works on the server (see `docs/DEPLOY.md`, step 7).
+
+To look at the page on the laptop in an ordinary browser, add your own Telegram user id to `.env`:
+
+```
+DEV_USER_ID=123456789
+```
+
+Run the bot and open http://127.0.0.1:8080. The page acts as that user without Telegram's login check.
+This only works while the web server listens on 127.0.0.1, and must never be set on the server.
+
 ## Data
 
 Profiles are stored in a local SQLite file, `kocatka.db`, created on first run. It is in `.gitignore`.
@@ -131,4 +145,8 @@ Prints counts of profiles, likes, matches, messages and bans. Read-only, safe to
 | `bot/handlers/` | Telegram handlers, one file per feature |
 | `bot/services/` | Business rules and queries, no Telegram code |
 | `bot/db/` | Tables and database session setup |
+| `webapp/server.py` | Mini App web server: login check and JSON API |
+| `webapp/auth.py` | Checks Telegram's signature on Mini App requests |
+| `webapp/static/` | The Mini App page: HTML, JavaScript, CSS |
+| `Caddyfile` | HTTPS in front of the Mini App on the server |
 | `tests/` | pytest tests. `conftest.py` has a fake Telegram connection |

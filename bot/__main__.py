@@ -5,13 +5,14 @@ import contextlib
 import logging
 
 from aiogram import Bot
-from aiogram.types import BotCommand
+from aiogram.types import BotCommand, MenuButtonWebApp, WebAppInfo
 
 from bot import strings
 from bot.app import build_dispatcher
 from bot.config import load_settings
 from bot.db.session import init_db, make_engine, make_sessionmaker
 from bot.jobs import create_missing_matches_once, run_expiry_loop
+from webapp.server import build_web_app, start_web_server
 
 
 async def main() -> None:
@@ -31,6 +32,20 @@ async def main() -> None:
     await bot.set_my_commands(
         [BotCommand(command=name, description=text) for name, text in strings.COMMANDS.items()]
     )
+    if settings.webapp_url:
+        # The button next to the message field opens the Mini App. It is set
+        # only when WEBAPP_URL is given, so running on the laptop leaves it alone.
+        await bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text=strings.WEBAPP_MENU_BUTTON, web_app=WebAppInfo(url=settings.webapp_url)
+            )
+        )
+    web_app = build_web_app(
+        bot, sessionmaker, settings.admin_id_list, dev_user_id=settings.dev_user_id
+    )
+    web_runner = await start_web_server(web_app, settings.web_host, settings.web_port)
+    logging.info("Mini App server on http://%s:%s", settings.web_host, settings.web_port)
+
     await create_missing_matches_once(bot, sessionmaker)
     expiry_task = asyncio.create_task(run_expiry_loop(bot, sessionmaker))
     try:
@@ -43,6 +58,7 @@ async def main() -> None:
         expiry_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await expiry_task
+        await web_runner.cleanup()
         await engine.dispose()
 
 

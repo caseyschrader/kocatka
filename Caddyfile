@@ -1,0 +1,6 @@
+# HTTPS in front of the Mini App. SITE_ADDRESS comes from WEBAPP_URL in .env.
+# Caddy gets and renews the certificate for that address by itself.
+{$SITE_ADDRESS} {
+	encode gzip
+	reverse_proxy bot:8080
+}

@@ -1,6 +1,6 @@
 # Deploying Kocatka to a server
 
-Target: a Debian 13 virtual machine on Google Cloud (GCP) with SSH access. Ubuntu 24.04 works too, see the note in step 1. The bot uses polling, so the server needs no open ports except SSH (22), and no domain or HTTPS. GCP's default firewall already allows SSH.
+Target: a Debian 13 virtual machine on Google Cloud (GCP) with SSH access. Ubuntu 24.04 works too, see the note in step 1. The bot uses polling, so the bot itself needs only SSH (22), which GCP's default firewall allows. The Mini App also needs ports 80 and 443 and an HTTPS address, see step 7.
 
 Data location: GCP has no region in Russia, while 152-FZ asks for Russian users' personal data to be stored in Russia. Acceptable for a small friends-only pilot after checking with the lawyer; move to a Russian host (for example cloud.ru) before a public launch. Moving is copying one file, see step 4.
 
@@ -40,8 +40,10 @@ The code goes to a git repository on the server itself, over SSH. No GitHub need
 **Server:**
 
 ```bash
-git init --bare ~/kocatka.git
+git init --bare --initial-branch=main ~/kocatka.git
 ```
+
+`--initial-branch=main` matters: without it the server repo expects `master`, and the clone below comes out empty.
 
 **Laptop:**
 
@@ -118,6 +120,35 @@ These backups sit on the same server. To keep one on the laptop too:
 ```powershell
 scp kocatka@SERVER_IP:kocatka/data/backups/kocatka-2026-11-22.db .
 ```
+
+## 7. Mini App and HTTPS (once)
+
+Telegram opens Mini Apps only over HTTPS. Caddy, the second service in `docker-compose.yml`, gets a free certificate by itself. It needs a web address and ports 80 and 443.
+
+**Keep the IP address.** GCP gives a new external IP after a VM stop and start, which would break the address below and the `server` git remote. In the GCP console, open **VPC network > IP addresses**, find the VM's external address and choose **Promote to static IP address**.
+
+**Open ports 80 and 443.** In the GCP console, open the VM, click **Edit**, tick **Allow HTTP traffic** and **Allow HTTPS traffic**, and save.
+
+**Pick the address.** With no domain of your own, use sslip.io: write the IP with dashes, for example `34-88-108-30.sslip.io` for `34.88.108.30`. It points to your server for free, with no sign-up. A domain of your own can replace it later by changing this one line.
+
+**Server:** add the address to `.env` (with your IP):
+
+```bash
+printf '\nWEBAPP_URL=https://34-88-108-30.sslip.io\n' >> ~/kocatka/.env
+cat ~/kocatka/.env | grep -v TOKEN
+```
+
+The `\n` at the start matters: if `.env` does not end with a line break, the new setting would otherwise be glued onto the last line and the bot would not start. The `cat` shows each setting on its own line, without printing the token.
+
+Then deploy as usual (see Everyday commands). The first start takes up to a minute while Caddy gets the certificate. Check it:
+
+```bash
+docker compose logs caddy | grep -i certificate
+```
+
+Open the address in a laptop browser. It should show "Откройте приложение через кнопку в чате с ботом в Telegram", with a padlock in the address bar, which means HTTPS works. In Telegram, the button next to the message field now says "Косатка" and opens the Mini App. If the button does not appear, close and reopen the chat with the bot.
+
+If certificate errors persist, sslip.io may have hit Let's Encrypt's weekly limit (it is shared by many people). Caddy then tries ZeroSSL by itself; if that fails too, a cheap domain of your own solves it.
 
 ## Everyday commands
 

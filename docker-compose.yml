@@ -1,4 +1,5 @@
-# One service: the bot. The database lives in ./data on the server, outside the
+# Two services: the bot (with the Mini App web server inside), and Caddy in front
+# of it for HTTPS. The database lives in ./data on the server, outside the
 # container, so it survives rebuilds. Secrets come from .env, which is never in git.
 services:
   bot:
@@ -6,13 +7,41 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: sqlite+aiosqlite:////data/kocatka.db
+      # Listen on Docker's internal network, so Caddy can reach the web server.
+      # No port is published: from the internet, only Caddy is reachable.
+      WEB_HOST: 0.0.0.0
+      WEB_PORT: "8080"
     volumes:
       - ./data:/data
     # Start again after a crash or a server reboot.
     restart: unless-stopped
     # Keep logs from filling the disk: at most 3 files of 10 MB.
-    logging:
+    logging: &logging
       driver: json-file
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Caddy answers on ports 80 and 443, gets a free HTTPS certificate by itself,
+  # renews it, and passes requests on to the bot's web server.
+  caddy:
+    image: caddy:2.8
+    environment:
+      # Read from WEBAPP_URL in .env, for example https://34-88-108-30.sslip.io
+      SITE_ADDRESS: ${WEBAPP_URL:?Set WEBAPP_URL in .env, see docs/DEPLOY.md}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates. Kept between restarts so Caddy does not ask for new ones each time.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - bot
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:
