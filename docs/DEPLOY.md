@@ -1,6 +1,10 @@
 # Deploying Kocatka to a server
 
-Target: an Ubuntu 24.04 virtual machine on cloud.ru with SSH access. The bot uses polling, so the server needs no open ports except SSH (22), and no domain or HTTPS.
+Target: a Debian 13 virtual machine on Google Cloud (GCP) with SSH access. Ubuntu 24.04 works too, see the note in step 1. The bot uses polling, so the server needs no open ports except SSH (22), and no domain or HTTPS. GCP's default firewall already allows SSH.
+
+Data location: GCP has no region in Russia, while 152-FZ asks for Russian users' personal data to be stored in Russia. Acceptable for a small friends-only pilot after checking with the lawyer; move to a Russian host (for example cloud.ru) before a public launch. Moving is copying one file, see step 4.
+
+SSH from the laptop: add the contents of `~\.ssh\id_ed25519.pub` to the VM's SSH keys in the GCP console. Browser SSH alone is not enough, because steps 2 to 4 copy files from the laptop.
 
 In the commands below, replace `kocatka` with your server user name and `SERVER_IP` with the server's public IP. Commands marked **laptop** run in PowerShell in the project folder. Commands marked **server** run after `ssh kocatka@SERVER_IP`.
 
@@ -10,19 +14,24 @@ In the commands below, replace `kocatka` with your server user name and `SERVER_
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y docker.io docker-compose-v2 git
+sudo apt install -y docker.io docker-compose git
 sudo usermod -aG docker $USER
 exit
 ```
+
+On Ubuntu 24.04 the compose package is called `docker-compose-v2` instead of `docker-compose`.
 
 Log in again so the `docker` group takes effect, then check:
 
 ```bash
 docker compose version
+whoami
 id -u
 ```
 
-`id -u` should print `1000`, the user id the container runs as. If it prints something else, run `sudo chown -R 1000:1000 ~/kocatka/data` after step 3.
+* `docker compose version` must print version 2 or later. If the command is not found, install Docker from Docker's own repository instead (docs.docker.com, "Install Docker Engine on Debian").
+* `whoami` is the user name to use wherever this guide says `kocatka`.
+* `id -u` should print `1000`, the user id the container runs as. On GCP it is often `1001`. If it is not `1000`, run `sudo chown -R 1000:1000 ~/kocatka/data` after step 3.
 
 ## 2. Send the code (once)
 
