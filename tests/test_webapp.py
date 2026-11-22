@@ -50,7 +50,12 @@ async def web(sessionmaker, bot, admins):
 
     async def make(dev_user_id: int | None = None) -> TestClient:
         app = build_web_app(
-            bot, sessionmaker, admins, dev_user_id=dev_user_id, photo_fetcher=fake_fetch
+            bot,
+            sessionmaker,
+            admins,
+            dev_user_id=dev_user_id,
+            photo_fetcher=fake_fetch,
+            bot_username="KocatkaTestBot",
         )
         client = TestClient(TestServer(app))
         await client.start_server()
@@ -153,7 +158,11 @@ async def test_me_for_registered_user(web, bot, chat):
     response = await client.get("/api/me", headers=login(bot, chat.user_id))
 
     assert response.status == 200
-    assert await response.json() == {"first_name": "Аня", "has_profile": True}
+    assert await response.json() == {
+        "first_name": "Аня",
+        "has_profile": True,
+        "bot_username": "KocatkaTestBot",
+    }
 
 
 async def test_me_for_user_without_profile(web, bot):
@@ -161,7 +170,11 @@ async def test_me_for_user_without_profile(web, bot):
 
     response = await client.get("/api/me", headers=login(bot, 777))
 
-    assert await response.json() == {"first_name": None, "has_profile": False}
+    assert await response.json() == {
+        "first_name": None,
+        "has_profile": False,
+        "bot_username": "KocatkaTestBot",
+    }
 
 
 async def test_banned_user_is_refused(web, bot, chat, admin):

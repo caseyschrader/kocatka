@@ -4,7 +4,7 @@ Routes:
     GET  /                the page (static/index.html)
     GET  /static/...      its script and styles
     GET  /api/strings     the page's Russian text, from bot/strings.py (no login needed)
-    GET  /api/me          who is logged in and whether they have a profile
+    GET  /api/me          who is logged in, whether they have a profile, the bot's username
     GET  /api/next        the next profile card, or {"card": null} when none are left
     POST /api/swipe       {"target_id", "action": "like" | "pass"}
     POST /api/report      {"target_id", "reason"}
@@ -37,6 +37,8 @@ ADMIN_IDS = web.AppKey("admin_ids", list)
 DEV_USER_ID = web.AppKey("dev_user_id", object)
 # How photos are fetched from Telegram. Tests swap in a fake.
 PHOTO_FETCHER = web.AppKey("photo_fetcher", object)
+# The bot's @username without the @, for invite links.
+BOT_USERNAME = web.AppKey("bot_username", str)
 # Set on each /api/ request by the login middleware.
 USER_ID = web.RequestKey("user_id", int)
 SESSION = web.RequestKey("session", AsyncSession)
@@ -88,7 +90,11 @@ async def get_me(request: web.Request) -> web.Response:
     user = await session.get(User, user_id)
     profile = await profiles.get_profile(session, user_id)
     return web.json_response(
-        {"first_name": user.first_name if user else None, "has_profile": profile is not None}
+        {
+            "first_name": user.first_name if user else None,
+            "has_profile": profile is not None,
+            "bot_username": request.app[BOT_USERNAME],
+        }
     )
 
 
@@ -226,6 +232,7 @@ def build_web_app(
     admin_ids: list[int],
     dev_user_id: int | None = None,
     photo_fetcher=fetch_from_telegram,
+    bot_username: str = "",
 ) -> web.Application:
     app = web.Application(middlewares=[login_and_session])
     app[BOT] = bot
@@ -233,6 +240,7 @@ def build_web_app(
     app[ADMIN_IDS] = admin_ids
     app[DEV_USER_ID] = dev_user_id
     app[PHOTO_FETCHER] = photo_fetcher
+    app[BOT_USERNAME] = bot_username
     app.router.add_get("/", index)
     app.router.add_static("/static", STATIC)
     app.router.add_get("/api/strings", get_strings)

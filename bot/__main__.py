@@ -40,8 +40,14 @@ async def main() -> None:
                 text=strings.WEBAPP_MENU_BUTTON, web_app=WebAppInfo(url=settings.webapp_url)
             )
         )
+    # The bot's @username, for the invite link in the Mini App.
+    me = await bot.get_me()
     web_app = build_web_app(
-        bot, sessionmaker, settings.admin_id_list, dev_user_id=settings.dev_user_id
+        bot,
+        sessionmaker,
+        settings.admin_id_list,
+        dev_user_id=settings.dev_user_id,
+        bot_username=me.username,
     )
     web_runner = await start_web_server(web_app, settings.web_host, settings.web_port)
     logging.info("Mini App server on http://%s:%s", settings.web_host, settings.web_port)

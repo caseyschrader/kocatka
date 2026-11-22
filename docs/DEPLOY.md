@@ -148,6 +148,14 @@ docker compose logs caddy | grep -i certificate
 
 Open the address in a laptop browser. It should show "Откройте приложение через кнопку в чате с ботом в Telegram", with a padlock in the address bar, which means HTTPS works. In Telegram, the button next to the message field now says "Косатка" and opens the Mini App. If the button does not appear, close and reopen the chat with the bot.
 
+If the Mini App opens as a blank white screen, there is no certificate yet. When the Caddy logs say "Timeout during connect (likely firewall problem)", ports 80 and 443 are still closed. Check on the server:
+
+```bash
+curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/tags
+```
+
+It must print `["http-server","https-server"]`. If it prints `[]`, the two boxes above were not saved: edit the VM again, tick both, and click **Save** at the bottom of the page. Then run `docker compose restart caddy`, so Caddy tries again at once instead of waiting up to half an hour.
+
 If certificate errors persist, sslip.io may have hit Let's Encrypt's weekly limit (it is shared by many people). Caddy then tries ZeroSSL by itself; if that fails too, a cheap domain of your own solves it.
 
 ## Everyday commands

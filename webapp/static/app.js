@@ -7,6 +7,7 @@ tg.ready();   // tells Telegram the page has loaded, so it hides its own loader
 tg.expand();  // open at full height
 
 let text = {};
+let botUsername = "";  // from /api/me, for the invite link
 let busy = false;  // true while a request is running, so a double tap does nothing
 
 const screen = document.getElementById("screen");
@@ -41,10 +42,48 @@ function showMessage(message) {
   screen.replaceChildren(el("p", "message", message));
 }
 
+function showSpinner() {
+  screen.replaceChildren(el("div", "spinner"));
+}
+
+// A full screen with an icon, a title, a short text and buttons.
+// Used when there is nothing to show, so it never looks like a blank page.
+function showEmptyState({ icon, title, message, buttons }) {
+  const box = el("div", "empty");
+  box.append(el("div", "empty-icon", icon), el("h1", null, title), el("p", null, message));
+  for (const button of buttons) {
+    const node = el("button", "empty-button " + (button.style || ""), button.label);
+    node.addEventListener("click", button.onClick);
+    box.append(node);
+  }
+  screen.replaceChildren(box);
+}
+
+function showNoMore() {
+  showEmptyState({
+    icon: "🐋",
+    title: text.no_more_title,
+    message: text.no_more,
+    buttons: [
+      { label: text.invite, style: "primary", onClick: invite },
+      { label: text.check_again, onClick: checkAgain },
+    ],
+  });
+}
+
+function showNoProfile() {
+  showEmptyState({
+    icon: "📝",
+    title: text.no_profile_title,
+    message: text.no_profile,
+    buttons: [{ label: text.create_profile, style: "primary", onClick: () => tg.close() }],
+  });
+}
+
 function showError(status) {
   if (status === 401) return showMessage(text.open_in_telegram);
   if (status === 403) return showMessage(text.banned);
-  if (status === 409) return showMessage(text.no_profile);
+  if (status === 409) return showNoProfile();
   showMessage(text.error || "⚠️");
 }
 
@@ -134,8 +173,33 @@ function showCard(card) {
 async function loadNext() {
   const { status, data } = await api("/api/next");
   if (status !== 200) return showError(status);
-  if (data.card === null) return showMessage(text.no_more);
+  if (data.card === null) return showNoMore();
   showCard(data.card);
+}
+
+// Opens Telegram's share sheet with a link to the bot.
+function invite() {
+  haptic("light");
+  const botLink = "https://t.me/" + botUsername;
+  const share = "https://t.me/share/url?url=" + encodeURIComponent(botLink) +
+    "&text=" + encodeURIComponent(text.invite_text);
+  try {
+    tg.openTelegramLink(share);
+  } catch (e) {
+    window.open(share, "_blank");  // an ordinary browser, when testing locally
+  }
+}
+
+async function checkAgain() {
+  if (busy) return;
+  busy = true;
+  try {
+    haptic("light");
+    showSpinner();
+    await loadNext();
+  } finally {
+    busy = false;
+  }
 }
 
 async function swipe(card, action) {
@@ -205,7 +269,8 @@ async function main() {
   text = await (await fetch("/api/strings")).json();
   const me = await api("/api/me");
   if (me.status !== 200) return showError(me.status);
-  if (!me.data.has_profile) return showMessage(text.no_profile);
+  botUsername = me.data.bot_username;
+  if (!me.data.has_profile) return showNoProfile();
   await loadNext();
 }
 
